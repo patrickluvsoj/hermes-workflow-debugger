@@ -64,3 +64,40 @@ def test_live_failure_resolves_to_its_incident_signature(live):  # task 1.7
     match = [t for t in traces if t["file"] == name]
     assert match and match[0]["error_sig"] == expected
     print(f"\n{name} -> error_sig={match[0]['error_sig']}")
+
+
+def test_api_state_matches_the_newest_output_file_of_every_step(tmp_path):  # O2
+    """Independent of the parser: the newest file is found with ls-style sorting
+    and judged with a plain regex on its status line."""
+    import json
+    import threading
+    import urllib.request
+
+    from wfd.context import build_context
+    from wfd.server import make_server
+
+    context = build_context(data_dir=tmp_path)
+    server = make_server(context, 0)
+    threading.Thread(target=lambda: server.serve_forever(poll_interval=0.02), daemon=True).start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{server.server_address[1]}/api/state") as response:
+            state = json.loads(response.read())
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert state["mode"] == "live"
+    rows = []
+    for workflow in state["workflows"]:
+        for step in workflow["steps"]:
+            folder = context.profile_root / "cron" / "output" / step["job_id"]
+            newest = sorted(p.name for p in folder.glob("*.md"))[-1]
+            head = (folder / newest).read_text(errors="replace").split("\n\n", 2)
+            failed = bool(re.search(FAILED_GREP, "\n\n".join(head[:2]), re.M))
+            api = next((t for t in [step["latest"]] if t and t["state"] != "missed"), None)
+            shown = (api["file"], api["state"]) if api else (None, None)
+            if step["latest"] and step["latest"]["state"] == "missed":
+                shown = ("(missed is newer) " + str(step["last_run"]), "missed")
+            ok = shown == (newest, "failed" if failed else "ok")
+            rows.append((ok, f"{step['title']:<18} disk={newest} {'failed' if failed else 'ok':<6} api={shown[0]} {shown[1]}"))
+    print("\n" + "\n".join(("MATCH  " if ok else "DIFF   ") + line for ok, line in rows))
+    assert len(rows) == 7 and all(ok for ok, _ in rows)
