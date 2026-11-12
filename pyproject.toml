@@ -1,0 +1,23 @@
+[project]
+name = "wfd"
+version = "0.1.0"
+description = "Local, read-only workflow debugger for Hermes CRON automations"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6", "croniter>=2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+wfd = "wfd.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["wfd"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: reads the real Hermes profile (skipped unless WFD_LIVE=1)"]
