@@ -1,2 +1,21 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Hermes Workflow Debugger</title><link rel="stylesheet" href="/app.css"></head><body><script src="/app.js"></script></body></html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hermes Workflow Debugger</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Workflows">
+    <div class="brand"><div class="wm">Hermes Agent</div><div class="sub">Workflow debugger</div></div>
+    <div id="wfs"></div>
+    <div class="railfoot" id="foot"></div>
+  </nav>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast" role="status"></div><div class="tip" id="tip" role="tooltip"></div>
+<script src="/app.js"></script>
+</body>
+</html>

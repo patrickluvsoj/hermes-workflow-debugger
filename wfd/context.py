@@ -28,6 +28,7 @@ class Context:
     data_dir: Path
     summary_db: Path
     fixed_now: datetime | None = None
+    label: str | None = None   # shown in the rail footer; defaults to the profile folder name
 
     def __post_init__(self):
         self.reader = HermesReader(self.profile_root, self.data_dir)
@@ -46,7 +47,10 @@ class Context:
     def state(self) -> dict:
         from .state import compute_state
 
-        return compute_state(self.reader, self.traces, self.scaffold_dir, self.summaries(), self.now(), self.mode)
+        state = compute_state(self.reader, self.traces, self.scaffold_dir, self.summaries(), self.now(), self.mode)
+        if self.label:
+            state["profile"] = self.label
+        return state
 
 
 def build_context(profile_root=None, scaffolds=None, fixtures: bool = False, data_dir=None) -> Context:
@@ -63,6 +67,7 @@ def build_context(profile_root=None, scaffolds=None, fixtures: bool = False, dat
             data_dir=data / "fixture-data",
             summary_db=root / "debugger.db",
             fixed_now=build_fixtures.NOW,
+            label="example",
         )
     profile = Path(profile_root).expanduser() if profile_root else default_profile_root()
     folder = scaffolds or os.environ.get("WFD_SCAFFOLDS")
