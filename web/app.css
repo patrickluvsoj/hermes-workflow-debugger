@@ -83,7 +83,7 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .calm .path { color: var(--text); overflow-wrap: anywhere; }
 
 /* step strip */
-.pipe { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; }
+.pipe { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0; }
 .step { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; min-width: 210px;
   padding: 11px 12px 12px 14px; border: 1px solid var(--border); background: var(--bg); }
 .step:hover { background: var(--card); }
@@ -95,16 +95,16 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .step .name { font-weight: 600; grid-column: 1; font-size: 15px; }
 .step .state { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 4px; align-items: flex-start; }
 .step .cap { grid-column: 1 / -1; margin-top: 4px; }
-.arrow { display: grid; place-items: center; width: 34px; color: var(--text-3); }
+.step[aria-pressed="true"] { max-width: 400px; }
+.step .what { grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  font-size: 14px; line-height: 1.5; color: var(--text); white-space: normal; }
+.step .script { grid-column: 1 / -1; margin-top: 6px; overflow-wrap: anywhere; }
+.arrow { display: grid; place-items: center; width: 34px; height: 91px; color: var(--text-3); }
 .arrow svg { width: 22px; height: 22px; }
 .gap { width: 12px; height: 12px; flex: none; }
 
 /* selected step: source line and trace list */
-.src { margin-top: 26px; padding-left: 14px; border-left: 3px solid var(--primary); }
-.src .what-name { font-size: 15px; font-weight: 600; line-height: 1.3; }
-.src .what { color: var(--text); font-size: 15px; line-height: 1.5; margin-top: 2px; max-width: 72ch; }
-.src .mono { display: block; margin-top: 6px; overflow-wrap: anywhere; }
-.traces, #detail > .detail { margin-top: 14px; }
+#detail { margin-top: 26px; }
 .traces { border-top: 1px solid var(--border); }
 .t { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .t:hover { background: var(--card); }
@@ -139,7 +139,7 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
   .main { padding: 18px 16px 40px; }
   .pipe { flex-direction: column; }
   .arrow { width: 100%; height: 22px; } .arrow svg { transform: rotate(90deg); }
-  .step { width: 100%; }
+  .step, .step[aria-pressed="true"] { width: 100%; max-width: none; }
   .tog { grid-template-columns: 30px 150px minmax(0, 1fr); }
   .tog .dur, .h { display: none; }
 }

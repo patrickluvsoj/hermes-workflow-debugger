@@ -160,6 +160,11 @@ function stepCaption(st) {
   parts.push(last);
   return parts.join(' · ');
 }
+// The selected step box grows to hold the step's description and its script line.
+function stepMore(st) {
+  const script = st.source ? `${esc(st.source.script)} · changed ${esc(short(st.source.changed_at))}` : 'no script on file';
+  return (st.description ? `<span class="what">${esc(st.description)}</span>` : '') + `<span class="script mono">${script}</span>`;
+}
 function pipeHTML(w) {
   return `<div class="pipe">` + w.steps.map((st, i) =>
     // An arrow means "depends on the step before". Independent neighbours get a plain gap.
@@ -167,7 +172,7 @@ function pipeHTML(w) {
     `<button class="step" data-step="${esc(st.id)}" aria-pressed="${st.id === S.step}">
       <span class="kind">cron · ${esc(schedule(st.schedule))}</span><span class="state">${g(st.health)}${st.paused ? g('paused') : ''}</span>
       <span class="name">${esc(st.title)}</span>
-      <span class="cap mono">${esc(stepCaption(st))}</span>
+      <span class="cap mono">${esc(stepCaption(st))}</span>${st.id === S.step ? stepMore(st) : ''}
     </button>`).join('') + `</div>`;
 }
 
@@ -193,19 +198,13 @@ function traceRow(st, t) {
   return h;
 }
 function tracesHTML(st) {
-  const script = st.source
-    ? `${esc(st.source.script)} · changed ${esc(short(st.source.changed_at))}`
-    : 'no script on file';
-  const src = `<h2 class="what-name">${esc(st.title)}</h2>` +
-    (st.description ? `<p class="what">${esc(st.description)}</p>` : '') +
-    `<span class="mono">${script}</span>`;
   const list = S.traces[st.job_id];
   let body;
   if (!list) body = `<div class="detail"><div class="empty mono">reading</div></div>`;
   else if (list.error) body = `<div class="detail"><div class="empty">The trace list could not be read.</div></div>`;
   else if (!list.length) body = `<div class="detail"><div class="empty">${g('none', null, true)}<span>No traces on file.${st.paused && st.paused_since ? ' Paused since ' + esc(day(parse(st.paused_since))) + '.' : ''}</span></div></div>`;
   else body = `<div class="traces">` + list.map(t => traceRow(st, t)).join('') + `</div>`;
-  return `<div class="src">${src}</div>` + body;
+  return body;
 }
 
 function renderMain() {

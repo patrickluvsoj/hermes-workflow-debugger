@@ -174,11 +174,14 @@ def main(out: Path) -> int:
               b.js("document.querySelector('.traces').children[1].querySelector('pre.out') !== null"))
         acts = b.js("[...document.querySelector('.t .act').children].map(e => e.dataset.tip)")
         check("AC-11", "no session link when the output has no session ID", acts == ["Output", "Copy run ID", "CRON source industry-analysis-runner.py"], " | ".join(acts))
-        src = b.js("T.txt('.src')")
-        check("AC-11", "step shows its script and when it last changed", "industry-analysis-runner.py · changed Nov 10 17:40" in src, src)
-        check("AC-11", "selected step's name and description are shown in primary text at 15px above its traces",
-              b.js("T.txt('.src .what-name')") == "Industry analysis" and b.js("T.txt('.src .what')") == "Picks a company from the watch list and writes the analysis note."
-              and b.js("T.css('.src .what', 'color')") == "rgb(230, 237, 243)" and b.js("T.css('.src .what', 'fontSize')") == "15px")
+        src = b.js("T.txt('.step[aria-pressed=true] .script')")
+        check("AC-11", "selected step shows its script and when it last changed", src == "industry-analysis-runner.py · changed Nov 10 17:40", src)
+        check("AC-11", "selected step box expands to hold its description, in primary text at 14px; other boxes stay short",
+              b.js("T.txt('.step[aria-pressed=true] .what')") == "Picks a company from the watch list and writes the analysis note."
+              and b.js("T.css('.step[aria-pressed=true] .what', 'color')") == "rgb(230, 237, 243)" and b.js("T.css('.step[aria-pressed=true] .what', 'fontSize')") == "14px"
+              and b.js("T.n('.step .what')") == 1
+              and b.js("document.querySelector('.step[aria-pressed=true]').offsetHeight > document.querySelector('.step[aria-pressed=false]').offsetHeight + 40"),
+              b.js("[...document.querySelectorAll('.step')].map(e => e.offsetWidth + 'x' + e.offsetHeight).join(' ')"))
         href = b.js("document.querySelector('.t .act a').getAttribute('href')")
         check("AC-11", "step links to its CRON source", href == "/api/source/a1f0c0de0002", href)
         collect_contrast(b, "dark", "F1")
