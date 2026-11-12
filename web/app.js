@@ -193,9 +193,12 @@ function traceRow(st, t) {
   return h;
 }
 function tracesHTML(st) {
-  const src = (st.description ? `<span class="what">${esc(st.description)}</span>` : '') + (st.source
-    ? `<span class="mono">${esc(st.source.script)} · changed ${esc(short(st.source.changed_at))}</span>`
-    : `<span class="mono">no script on file</span>`);
+  const script = st.source
+    ? `${esc(st.source.script)} · changed ${esc(short(st.source.changed_at))}`
+    : 'no script on file';
+  const src = `<h2 class="what-name">${esc(st.title)}</h2>` +
+    (st.description ? `<p class="what">${esc(st.description)}</p>` : '') +
+    `<span class="mono">${script}</span>`;
   const list = S.traces[st.job_id];
   let body;
   if (!list) body = `<div class="detail"><div class="empty mono">reading</div></div>`;
