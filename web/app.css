@@ -72,6 +72,8 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .why { padding: 16px 20px 16px 17px;
   background: color-mix(in srgb, var(--destructive) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--destructive) 35%, transparent); border-left: 3px solid var(--destructive); }
+/* reason summary for a no-op: same block, grey edge, no tint. Red stays the only alarm */
+.why.quiet { background: none; border-color: var(--border); border-left: 3px solid var(--border-strong); }
 .why + .why, .why + .calm, .calm + .why, .calm + .calm { margin-top: 12px; }
 .why h2 { font-size: 19px; font-weight: 600; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .why h2 .mono { font-size: .8rem; }

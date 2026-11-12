@@ -19,6 +19,8 @@ Scenarios
   F7 scaffolds-empty/                no scaffold files at all
   F8 Weekly Newsletter               quality gate ran and did nothing (step_result line, no-op);
                                      the send step is a no-op by a missing success pattern
+  F10 Nightly Digest                 no-ops with no summary block: one blames an upstream step
+                                     (one line), one is a check run (nothing)
   F9 Inbox Tidy                      ok: one step is allowed to be silent, one accepts a no-op
 """
 from __future__ import annotations
@@ -36,6 +38,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from wfd.summaries import SCHEMA as SUMMARY_SCHEMA  # noqa: E402
+from wfd.traces import noop_sig_for_text  # noqa: E402
 from wfd.traces import parse_trace  # noqa: E402
 
 NOW = datetime(2026, 11, 12, 10, 42, 0)
@@ -201,6 +204,17 @@ JOBS = [
                 (at(11, 11, 5, 30, 4), "ok", ok_body("unread=6\nreport=sent\n" + result_line("done")), 3),
                 (at(11, 10, 5, 30, 3), "ok", ok_body("unread=0\n" + result_line(
                     "noop", "nothing_new_upstream", "No unread mail since the last report.")), 2)]},
+    {"id": "c9f0c0de0001", "name": "Digest collect", "script": "digest-collect.py",
+     "schedule": ("cron", "0 3 * * *"), "next": at(11, 13, 3), "changed": at(9, 20, 11, 0),
+     "traces": [(at(11, 12, 3, 0, 6), "ok", ok_body("items=0\n" + result_line("done")), 5)]},
+    {"id": "c9f0c0de0002", "name": "Digest build", "script": "digest-build.py",
+     "schedule": ("cron", "10 3 * * *"), "next": at(11, 13, 3, 10), "changed": at(9, 20, 11, 2),
+     "traces": [(at(11, 12, 3, 10, 4), "ok", ok_body(result_line(
+                    "noop", "upstream_failed", "The collect step left no items file.")), 3)]},
+    {"id": "c9f0c0de0003", "name": "Digest send", "script": "digest-send.py",
+     "schedule": ("cron", "20 3 * * *"), "next": at(11, 13, 3, 20), "changed": at(9, 20, 11, 4),
+     "traces": [(at(11, 12, 3, 20, 3), "ok", ok_body(result_line(
+                    "noop", "check_only", "Check mode. Nothing was sent.")), 2)]},
     # Not named by any workflow file: the dashboard must not show it or serve its files.
     {"id": "f6f0c0de0001", "name": "Nightly notes backup", "script": "notes-backup.sh",
      "schedule": ("cron", "0 4 * * *"), "next": at(11, 13, 4), "changed": at(7, 1, 12, 0),
@@ -214,6 +228,11 @@ INCIDENTS = {  # (job_id, trace time) -> error_sig
     ("d4f0c0de0001", at(11, 5, 8, 0, 7)): "f20a6d9914ce",
 }
 
+NOOP_SUMMARIES = {  # (job_id, trace time) -> (summary, written at). For a no-op with no sentence of its own.
+    ("a7f0c0de0003", at(11, 12, 8, 0, 4)): (
+        "The send step looked for a draft approved by the quality gate and found none, so it had no one to send to. "
+        "It finished without an error and sent nothing this week.", at(11, 12, 8, 5, 0)),
+}
 SUMMARIES = {  # (job_id, trace time) -> (summary, written at)
     ("a1f0c0de0002", at(11, 11, 8, 1, 9)): (
         "The source collection stage could not download the ACME 10-K because the filings site answered "
@@ -351,6 +370,27 @@ steps:
     expect:
       noop: ok
 """,
+    "nightly-digest.yaml": """schema_version: 1
+id: nightly-digest
+title: Nightly Digest
+description: Collects the day's items, builds a digest and sends it.
+steps:
+  - id: collect
+    title: Collect
+    description: Gathers the day's items into one file.
+    job_id: c9f0c0de0001
+    depends_on: []
+  - id: build
+    title: Build
+    description: Builds the digest from the collected items.
+    job_id: c9f0c0de0002
+    depends_on: [collect]
+  - id: send
+    title: Send
+    description: Sends the digest.
+    job_id: c9f0c0de0003
+    depends_on: [build]
+""",
     "broken-example.yaml": """schema_version: 1
 id: broken-example
 title: Broken example
@@ -422,6 +462,7 @@ def build(out: Path | str) -> Path:
     conn.executescript(EXECUTIONS_SCHEMA)
     counter = 0
     local_sigs: dict[tuple, str] = {}
+    noop_sigs: dict[tuple, str] = {}
     for job in JOBS:
         _write(profile / "scripts" / job["script"],
                f"# {job['name']}\n# Placeholder script for the fixture profile.\nprint('ok')\n", job["changed"])
@@ -430,6 +471,7 @@ def build(out: Path | str) -> Path:
             text = output_text(job, when, kind, body)
             _write(profile / "cron" / "output" / job["id"] / name, text, when)
             local_sigs[(job["id"], when)] = parse_trace(job["id"], name, text)["local_sig"]
+            noop_sigs[(job["id"], when)] = noop_sig_for_text(job["id"], text)
             counter += 1
             started = when - timedelta(seconds=seconds)
             conn.execute(
@@ -462,6 +504,11 @@ def build(out: Path | str) -> Path:
         conn.execute(
             "insert into summaries (job_id, error_sig, trace_file, status, summary, session_id, attempts, created_at) "
             "values (?, ?, ?, 'ready', ?, NULL, 1, ?)", (job_id, sig, output_name(when), text, written.isoformat()))
+    for (job_id, when), (text, written) in NOOP_SUMMARIES.items():
+        conn.execute(
+            "insert into summaries (job_id, error_sig, trace_file, status, summary, session_id, attempts, created_at) "
+            "values (?, ?, ?, 'ready', ?, NULL, 1, ?)",
+            (job_id, noop_sigs[(job_id, when)], output_name(when), text, written.isoformat()))
     conn.commit()
     conn.close()
     os.utime(summary_db, (NOW.timestamp(), NOW.timestamp()))

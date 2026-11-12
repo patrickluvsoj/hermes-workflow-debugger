@@ -138,9 +138,19 @@ step_result={"schema": 1, "outcome": "noop", "reason": "quality_gate_not_met", "
 - A step with no `expect` block behaves as before: silent is failed, and anything that exits cleanly is ok.
 - A no-op step does not block the steps after it.
 
+A no-op step gets a short reason above the step strip, in a grey block:
+
+| The no-op run | What is shown above the steps |
+|---|---|
+| Printed a `step_result` line with a `detail` sentence | That sentence, as written |
+| Printed a reason code only, or was found by a pattern | A written summary, if the watcher runs (next section). Until then, what the script printed |
+| Reason is `upstream_failed` | One line naming the failed step |
+| Reason is `check_only` or `canary_only` | Nothing |
+| Step sets `noop: ok`, or is paused | Nothing |
+
 ## Error summaries (optional)
 
-Without this, a failed step shows the first error line of its output. To get written summaries, run the watcher on a schedule. Each pass looks for new failures and asks a one-shot Hermes session, with no tools, on your default model, for a summary. A pass with nothing new makes no model call.
+Without this, a failed step shows the first error line of its output. To get written summaries, run the watcher on a schedule. Each pass looks for new failures, and for no-op runs whose script gave no sentence of its own, and asks a one-shot Hermes session, with no tools, on your default model, for a summary. A pass with nothing new makes no model call.
 
 ```bash
 cp examples/workflow-debugger-watcher.py ~/.hermes/profiles/daily/scripts/

@@ -42,6 +42,9 @@ def render_status(state: dict) -> str:
                 note = "waiting on " + ", ".join(step["blocked_by"])
             elif step["health"] == "noop":
                 note = f"{_when(latest['time'])}  ran and did nothing" + (f"  ({_why(latest)})" if _why(latest) else "")
+                summary = step.get("summary") or {}
+                if summary.get("status") == "ready":
+                    note += "\n               " + summary["text"]
             elif step["health"] == "none":
                 note = "no runs on file"
             elif step["health"] == "ok" and latest and latest.get("state") == "ok" and _why(latest):

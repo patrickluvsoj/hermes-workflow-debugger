@@ -71,7 +71,7 @@ def missed_trace(when: datetime) -> dict:
     return {
         "file": None, "time": when.replace(microsecond=0).isoformat(), "state": "missed",
         "status_line": "scheduled, never ran", "status_known": True, "first_error_line": None,
-        "outcome": None, "reason": None, "detail": None, "result_problem": None,
+        "outcome": None, "reason": None, "detail": None, "result_problem": None, "noop_sig": None,
         "session_id": None, "workflow_run_id": None, "local_sig": None, "duration_s": None,
     }
 
@@ -182,6 +182,56 @@ def step_traces(reader, store_traces, job: dict, job_id: str, now: datetime, exp
     return traces
 
 
+# Reason summary for a no-op step (plan section 13). What is shown above the step strip:
+#   "none"    nothing. The run was a deliberate check, dry run or canary.
+#   "line"    one line. The script says an upstream step failed; that step has its own block.
+#   "script"  a block with the script's own sentence, as written. No model call.
+#   "ai"      a block with a written summary. The script gave no sentence (a reason code
+#             only, or no step_result line at all). Until it is ready, what the script printed.
+QUIET_NOOP_REASONS = ("check_only", "canary_only")
+UPSTREAM_NOOP_REASON = "upstream_failed"
+NO_SUCCESS_LINE = "The expected success line was not printed."
+
+
+def noop_summary_mode(trace: dict) -> str:
+    reason = trace.get("reason")
+    if reason in QUIET_NOOP_REASONS:
+        return "none"
+    if reason == UPSTREAM_NOOP_REASON:
+        return "line"
+    if trace.get("outcome") == "noop" and trace.get("detail"):
+        return "script"
+    return "ai"
+
+
+def _noop_summary_for(trace: dict, summaries) -> dict:
+    mode = noop_summary_mode(trace)
+    fallback = trace.get("detail") or trace.get("reason") or NO_SUCCESS_LINE
+    base = {"mode": mode, "reason": trace.get("reason"), "status": None, "text": None, "summarized_at": None,
+            "fallback": fallback}
+    if mode == "script":
+        return {**base, "status": "script", "text": trace["detail"]}
+    if mode != "ai":
+        return base
+    row = summaries.get(trace["job_id"], trace["noop_sig"]) if summaries and trace.get("noop_sig") else None
+    if row and row["status"] == "ready" and row.get("summary"):
+        return {**base, "status": "ready", "text": row["summary"], "summarized_at": row["created_at"]}
+    return {**base, "status": "unavailable" if row and row["status"] == "unavailable" else "pending"}
+
+
+def noop_problem(step: dict, steps: list[dict], summaries) -> dict | None:
+    """The entry above the step strip for a no-op step, or None when it gets none."""
+    if step["paused"] or step["health"] != "noop":
+        return None
+    summary = _noop_summary_for(step["latest"], summaries)
+    if summary["mode"] == "none":
+        return None
+    by_id = {s["id"]: s for s in steps}
+    failed = [by_id[d]["title"] for d in step["depends_on"] if d in by_id and by_id[d]["health"] == "failed"]
+    return {"step_id": step["id"], "title": step["title"], "kind": "noop", "time": step["latest"]["time"],
+            "summary": summary, "upstream_failed": failed}
+
+
 def _summary_for(trace: dict, summaries) -> dict:
     row = summaries.get(trace["job_id"], trace["error_sig"]) if summaries and trace.get("error_sig") else None
     if row and row["status"] == "ready" and row.get("summary"):
@@ -229,6 +279,11 @@ def compute_state(reader, trace_store, scaffold_dir, summaries, now: datetime, m
             if not step["paused"] and step["health"] in ("failed", "missed"):
                 problems.append({"step_id": step["id"], "title": step["title"], "kind": step["health"],
                                  "time": step["latest"]["time"], "summary": step["summary"]})
+        for step in steps:
+            entry = noop_problem(step, steps, summaries)
+            if entry:
+                step["summary"] = entry["summary"]
+                problems.append(entry)
             del step["traces"], step["own"]
         times = [step["problem_time"] for step in steps if not step["paused"] and step["problem_time"]
                  and step["health"] != "ok"]

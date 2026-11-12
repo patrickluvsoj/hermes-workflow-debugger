@@ -39,6 +39,7 @@ def test_f1_is_first_in_the_rail(fixture_state):
         "broken-example",                  # failed, bad file
         "google-oauth-token-refresh",      # missed
         "weekly-newsletter",               # no-op
+        "nightly-digest",                  # no-op
         "hermes-cron-error-email-report",  # ok
         "inbox-tidy",                      # ok
     ]
@@ -121,13 +122,19 @@ def test_state_holds_only_the_latest_trace_per_step(fixture_state):
 def test_f8_newsletter_gate_is_a_noop_with_its_reason(fixture_state, reader):
     wf = by_id(fixture_state())["weekly-newsletter"]
     s = steps(wf)
-    assert wf["health"] == "noop" and wf["problems"] == [], "a no-op gets no error summary block"
+    assert wf["health"] == "noop"
+    assert [(p["step_id"], p["kind"], p["summary"]["mode"], p["summary"]["status"]) for p in wf["problems"]] == [
+        ("quality-gate", "noop", "script", "script"), ("send", "noop", "ai", "ready")]
+    gate_block, send_block = wf["problems"]
+    assert gate_block["summary"]["text"] == "The draft scored 61 of 100. The gate needs 75.", "the script's sentence, as written"
+    assert send_block["summary"]["text"].startswith("The send step looked for a draft approved")
+    assert send_block["summary"]["fallback"] == "The expected success line was not printed."
     assert (s["draft"]["health"], s["quality-gate"]["health"], s["send"]["health"]) == ("ok", "noop", "noop")
     gate = s["quality-gate"]["latest"]
     assert (gate["state"], gate["outcome"], gate["reason"]) == ("noop", "noop", "quality_gate_not_met")
     assert gate["detail"] == "The draft scored 61 of 100. The gate needs 75."
     assert gate["status_line"] is None and gate["error_sig"] is None
-    assert s["quality-gate"]["summary"] is None and s["send"]["blocked_by"] == [], "a no-op upstream does not block"
+    assert s["quality-gate"]["summary"]["mode"] == "script" and s["send"]["blocked_by"] == [], "a no-op upstream does not block"
     send = s["send"]["latest"]
     assert (send["state"], send["outcome"], send["reason"], send["detail"]) == ("noop", None, None, None)
     assert wf["problem_time"] == "2026-11-12T08:00:04"
@@ -157,5 +164,27 @@ def test_watcher_does_not_summarise_a_noop_or_an_allowed_silence(fx, tmp_path):
     context = Context(mode="fixtures", profile_root=fx / "profile", scaffold_dir=fx / "scaffolds",
                       data_dir=tmp_path / "data", summary_db=fx / "debugger.db", fixed_now=NOW)
     jobs = {step["job_id"] for _wf, step, _trace in pending_failures(context)}
-    assert jobs.isdisjoint({"a7f0c0de0002", "a7f0c0de0003", "b8f0c0de0001", "b8f0c0de0002"})
+    assert jobs.isdisjoint({"a7f0c0de0002", "b8f0c0de0001", "b8f0c0de0002", "c9f0c0de0002", "c9f0c0de0003"}), \
+        "no model call for a no-op with its own sentence, an accepted no-op, an allowed silence, a check run or an upstream failure"
     assert "a1f0c0de0002" in jobs
+
+
+def test_watcher_takes_failures_first_then_noops_without_a_sentence(fx, tmp_path):
+    from wfd.context import Context
+    from wfd.watcher import pending_failures
+
+    context = Context(mode="fixtures", profile_root=fx / "profile", scaffold_dir=fx / "scaffolds",
+                      data_dir=tmp_path / "data", summary_db=fx / "debugger.db", fixed_now=NOW)
+    pending = pending_failures(context)
+    states = [trace["state"] for _wf, _step, trace in pending]
+    assert states == sorted(states), "failed before noop"
+    assert [(step["job_id"], trace["noop_sig"][:5]) for _wf, step, trace in pending if trace["state"] == "noop"] == [
+        ("a7f0c0de0003", "noop-")]
+
+
+def test_f10_upstream_noop_is_one_line_and_a_check_run_gets_nothing(fixture_state):
+    wf = by_id(fixture_state())["nightly-digest"]
+    s = steps(wf)
+    assert (wf["health"], s["collect"]["health"], s["build"]["health"], s["send"]["health"]) == ("noop", "ok", "noop", "noop")
+    assert [(p["step_id"], p["summary"]["mode"], p["upstream_failed"]) for p in wf["problems"]] == [("build", "line", [])]
+    assert s["send"]["summary"] is None and s["send"]["latest"]["reason"] == "check_only"

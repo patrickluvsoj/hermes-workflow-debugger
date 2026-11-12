@@ -84,7 +84,7 @@ def test_state_matches_wfd_status_json(tmp_path):
         server.server_close()
     assert status == 200
     assert served_state == json.loads(out.getvalue())
-    assert served_state["mode"] == "fixtures" and len(served_state["workflows"]) == 8
+    assert served_state["mode"] == "fixtures" and len(served_state["workflows"]) == 9
 
 
 def test_state_headers(served):

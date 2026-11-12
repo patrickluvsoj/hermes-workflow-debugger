@@ -7,7 +7,7 @@ from wfd.hermes_reader import HermesReader, to_local
 
 def test_reads_jobs(reader):
     jobs = reader.jobs()
-    assert len(jobs) == 16
+    assert len(jobs) == 19
     assert jobs["b2f0c0de0002"]["enabled"] is False
 
 

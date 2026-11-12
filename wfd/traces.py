@@ -84,6 +84,18 @@ def local_error_sig(job_id: str, body: str) -> str:
     return "local-" + digest[:12]
 
 
+def noop_sig(job_id: str, body: str) -> str:
+    """Signature of a no-op run. Run IDs, dates and counts are levelled out, so the same
+    cause on consecutive runs gives the same signature and is summarised once."""
+    kept = [line for line in body.splitlines() if not line.startswith(("workflow_run_id=", "workflow_run="))]
+    levelled = re.sub(r"[0-9a-f]{12,}|\d+", "#", "\n".join(kept))[:2000]
+    return "noop-" + hashlib.sha256((job_id + "\n" + levelled).encode("utf-8")).hexdigest()[:12]
+
+
+def noop_sig_for_text(job_id: str, text: str) -> str:
+    return noop_sig(job_id, _split(text)[1])
+
+
 def is_failure_line(line: str) -> bool:
     stripped = line.strip()
     if stripped.startswith("**Status:**"):
@@ -194,6 +206,7 @@ def parse_trace(job_id: str, name: str, text: str, expect: dict | None = None) -
         "session_id": session.group(1) if session else None,
         "workflow_run_id": run,
         "local_sig": local_error_sig(job_id, body) if failed else None,
+        "noop_sig": noop_sig(job_id, body) if state == "noop" else None,
         "duration_s": None,
     }
 

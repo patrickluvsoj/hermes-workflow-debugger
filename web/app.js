@@ -150,6 +150,16 @@ function summaryBlocks(w) {
   return w.problems.map(p => {
     if (p.kind === 'missed') return `<div class="calm">${g('missed', null, true)}<span>${esc(p.title)}: scheduled ${esc(when(p.time, ' '))}, never ran.</span></div>`;
     const s = p.summary || {};
+    if (p.kind === 'noop') {
+      if (s.mode === 'line') return `<div class="calm" data-noop="line">${g('noop', null, true)}<span>${esc(p.title)} did nothing: ${
+        p.upstream_failed.length ? esc(p.upstream_failed.join(', ')) + ' failed.' : 'an upstream step failed.'}</span></div>`;
+      const nhead = `<h2>${esc(p.title)} did nothing<span class="mono">${esc(when(p.time))}</span></h2>`;
+      const code = s.reason ? esc(s.reason) + ' · ' : '';
+      if (s.status === 'script') return `<div class="why quiet" data-noop="script">${nhead}<p>${esc(s.text)}</p><span class="mono">${code}reported by the script</span></div>`;
+      if (s.status === 'ready') return `<div class="why quiet" data-noop="ready">${nhead}<p>${esc(s.text)}</p><span class="mono">${code}summarized ${esc(short(s.summarized_at))}</span></div>`;
+      return `<div class="why quiet" data-noop="${esc(s.status || 'pending')}">${nhead}<p class="raw">${esc(s.fallback)}</p><span class="mono">${
+        s.status === 'unavailable' ? 'from the output · summary unavailable' : 'from the output · no summary yet'}</span></div>`;
+    }
     const head = `<h2>${esc(p.title)} failed<span class="mono">${esc(when(p.time))}</span></h2>`;
     if (s.status === 'ready') return `<div class="why" data-summary="ready">${head}<p>${esc(s.text)}</p><span class="mono">summarized ${esc(short(s.summarized_at))}</span></div>`;
     const note = s.status === 'unavailable' ? 'first error line · summary unavailable' : 'first error line · no summary yet';
