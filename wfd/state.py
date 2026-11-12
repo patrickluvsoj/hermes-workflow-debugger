@@ -212,8 +212,6 @@ def compute_state(reader, trace_store, scaffold_dir, summaries, now: datetime, m
                 "paused": paused,
                 "paused_since": (to_local(job.get("paused_at")).replace(microsecond=0).isoformat()
                                  if paused and to_local(job.get("paused_at")) else None),
-                "next_run_at": (to_local(job.get("next_run_at")).replace(microsecond=0).isoformat()
-                                if to_local(job.get("next_run_at")) else None),
                 "source": reader.script_info(job),
                 "traces": step_traces(reader, trace_store, job, item["job_id"], now),
             })

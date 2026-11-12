@@ -31,7 +31,7 @@ class SummaryStore:
 
     def _connect(self) -> sqlite3.Connection:
         if self.readonly:
-            conn = sqlite3.connect(f"file:{self.path}?mode=ro&immutable=1", uri=True)
+            conn = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
         else:
             conn = sqlite3.connect(str(self.path))
         conn.row_factory = sqlite3.Row
