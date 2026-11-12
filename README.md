@@ -111,4 +111,4 @@ If the checkout is not in `~/Code/hermes-workflow-debugger`, set `WFD_REPO` in t
 
 A prototype, built for one person's Hermes setup and tested against one Hermes version. Expect rough edges.
 
-MIT licence. See `LICENSE`.
+MIT licence, see `LICENSE`. The bundled JetBrains Mono font has its own licence, see `web/fonts/README.md`.
