@@ -126,6 +126,10 @@ def main(out: Path) -> int:
         b.goto(base + "/")
         check("AC-26", "light is the default theme when nothing is chosen",
               b.js("document.documentElement.dataset.theme") == "light" and b.js("getComputedStyle(document.body).backgroundColor") == "rgb(255, 255, 255)")
+        lib(b)
+        check("AC-26", "rail title reads Hermes Debugger at 22px on one line, with no sub-title",
+              b.js("T.txt('.brand')") == "Hermes Debugger" and b.js("T.css('.brand .wm', 'fontSize')") == "22px"
+              and b.js("document.querySelector('.brand .wm').offsetHeight") <= 24 and b.js("document.querySelector('.brand').children.length") == 1)
         # ---------------- first screen, zero clicks (O1, AC-8) ----------------
         goto(b, base + "/")
         b.wait("document.querySelector('pre.out')")

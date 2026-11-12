@@ -42,9 +42,8 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .app { flex: 1; display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 0; }
 .rail { background: var(--rail-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0;
   position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-.brand { padding: 18px 20px 16px; border-bottom: 1px solid var(--border); }
-.brand .wm { font-family: var(--f-chrome); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 16px; line-height: 1; }
-.brand .sub { font-size: .86rem; color: var(--text-2); margin-top: 6px; }
+.brand { padding: 20px 20px 18px; border-bottom: 1px solid var(--border); }
+.brand .wm { font-family: var(--f-chrome); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 22px; line-height: 1; }
 .wf { display: grid; grid-template-columns: 18px 1fr; gap: 4px 12px; width: 100%; padding: 12px 20px 12px 17px;
   border-left: 3px solid transparent; border-bottom: 1px solid var(--border); }
 .wf:hover { background: var(--card); }
