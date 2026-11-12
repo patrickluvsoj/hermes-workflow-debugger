@@ -1,6 +1,6 @@
 """Find new failures and write one summary each. The only module that calls a model.
 
-Run by `wfd watch --once`, normally from a Hermes CRON every 15 minutes. The
+Run by `wfd watch --once`, normally from a Hermes CRON every 5 minutes. The
 server never imports this module (tests/test_no_model_in_server.py).
 
 One pass (plan section 5.5):

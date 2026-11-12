@@ -95,7 +95,7 @@ Without this, a failed step shows the first error line of its output. To get wri
 
 ```bash
 cp examples/workflow-debugger-watcher.py ~/.hermes/profiles/daily/scripts/
-hermes cron create "15m" --no-agent --script workflow-debugger-watcher.py --name "Workflow debugger watcher" --deliver local --failure-deliver local
+hermes cron create "5m" --no-agent --script workflow-debugger-watcher.py --name "Workflow debugger watcher" --deliver local --failure-deliver local
 ```
 
 If the checkout is not in `~/Code/hermes-workflow-debugger`, set `WFD_REPO` in the script. To stop it: `hermes cron pause <job id>`, or `hermes cron remove <job id>` to delete it.

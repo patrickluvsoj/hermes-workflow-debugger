@@ -206,6 +206,15 @@ def main(out: Path) -> int:
         link = b.js("document.querySelector('.t .act a[href^=\"hermes://\"]').getAttribute('href')")
         check("AC-11", "session link appears when the output has a session ID",
               link == "hermes://open/sessions/20261110_020011_ab12cd" and len(acts) == 4, link)
+        b.resize(700 + 304, 900)
+        b.settle(0.3)
+        check("AC-12", "in a narrow window the step strip scrolls sideways instead of wrapping; the page itself does not",
+              b.js("(() => { const p = document.querySelector('.pipe'); const tops = [...p.querySelectorAll('.step')].map(e => e.getBoundingClientRect().top); "
+                   "return getComputedStyle(p).flexWrap === 'nowrap' && new Set(tops).size === 1 && p.scrollWidth > p.clientWidth && document.documentElement.scrollWidth <= innerWidth; })()"),
+              b.js("document.querySelector('.pipe').scrollWidth + ' wide in ' + document.querySelector('.pipe').clientWidth"))
+        b.shot(out / "03b-step-strip-overflows-dark.png", full=False)
+        b.resize(1440, 900)
+        b.settle(0.3)
         check("AC-12", "step with no traces on file says so in the step box",
               "no runs on file" in b.js("T.txt('.step[data-step=archive] .cap')")
               and b.js("document.querySelector('.step[data-step=archive] .glyph').classList.contains('g-none')"))

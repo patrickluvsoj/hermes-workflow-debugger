@@ -83,7 +83,9 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .calm .path { color: var(--text); overflow-wrap: anywhere; }
 
 /* step strip */
-.pipe { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0; }
+.pipe { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: 0; overflow-x: auto;
+  padding: 4px 4px 14px; margin: -4px -4px -14px; }  /* room for the focus ring and the pointer inside the scroll box */
+.pipe > * { flex: none; }
 .step { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; min-width: 210px;
   padding: 11px 12px 12px 14px; border: 1px solid var(--border); background: var(--bg); }
 .step:hover { background: var(--card); }
@@ -137,7 +139,8 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
   .wf[aria-current="true"] .desc { display: none; }
   .railfoot { margin-top: 0; }
   .main { padding: 18px 16px 40px; }
-  .pipe { flex-direction: column; }
+  .pipe { flex-direction: column; overflow-x: visible; }
+  .pipe > .step { flex: 0 0 auto; }
   .arrow { width: 100%; height: 22px; } .arrow svg { transform: rotate(90deg); }
   .step, .step[aria-pressed="true"] { width: 100%; max-width: none; }
   .tog { grid-template-columns: 30px 150px minmax(0, 1fr); }
