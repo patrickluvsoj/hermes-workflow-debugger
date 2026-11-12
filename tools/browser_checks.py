@@ -216,8 +216,33 @@ def main(out: Path) -> int:
         b.wait("document.querySelector('pre.out')")
         lib(b)
         heads = b.js("T.all('.why h2')")
-        check("AC-19", "several failed steps: one block per failed step, in step order",
-              len(heads) == 2 and heads[0].startswith("Pull orders failed") and heads[1].startswith("Pull inventory failed"), " / ".join(heads))
+        rows = b.js("[...document.querySelectorAll('.sumrow')].map(r => [r.querySelector('b').textContent, r.querySelector('.gist').textContent.slice(0, 24), r.getAttribute('aria-expanded'), r.offsetHeight])")
+        check("AC-57", "several failed steps: the first is open, the next is one line with its reason",
+              len(heads) == 1 and heads[0].startswith("Pull orders failed") and len(rows) == 1 and rows[0][0] == "Pull inventory failed"
+              and len(rows[0][1]) > 10 and rows[0][2] == "false" and rows[0][3] <= 44, f"{heads} {rows}")
+        check("AC-57", "the one-line reason is cut with an ellipsis, not wrapped, and keeps its red edge",
+              b.js("T.css('.sumrow .gist', 'textOverflow')") == "ellipsis" and b.js("T.css('.sumrow.failed', 'borderLeftColor')") == "rgb(248, 81, 73)")
+        b.click(".sumrow")
+        b.settle(0.4)
+        lib(b)
+        heads = b.js("T.all('.why h2')")
+        check("AC-58", "clicking a line opens it, closes the other and selects its step",
+              len(heads) == 1 and heads[0].startswith("Pull inventory failed") and b.js("T.all('.sumrow b')") == ["Pull orders failed"]
+              and b.js("T.txt('.step[aria-pressed=true] .name')") == "Pull inventory", f"{heads}")
+        b.click(".step[data-step=pull-orders]")
+        b.settle(0.4)
+        lib(b)
+        check("AC-58", "selecting a step opens its reason", b.js("T.all('.why h2')")[0].startswith("Pull orders failed") and b.js("T.n('.sumrow')") == 1)
+        b.click(".sumrow")
+        b.settle(0.3)
+        b.js("document.querySelector('.sumrow').focus(); null")
+        b.key("Enter")
+        b.settle(0.4)
+        lib(b)
+        check("AC-58", "a line opens from the keyboard and focus moves to its step",
+              b.js("T.all('.why h2')")[0].startswith("Pull orders failed") and b.js("document.activeElement.dataset.step") == "pull-orders")
+        b.wait("document.querySelector('pre.out')")
+        lib(b)
         acts = b.js("[...document.querySelector('.t .act').children].map(e => e.dataset.tip)")
         link = b.js("document.querySelector('.t .act a[href^=\"hermes://\"]').getAttribute('href')")
         check("AC-11", "session link appears when the output has a session ID",
@@ -307,7 +332,20 @@ def main(out: Path) -> int:
         check("AC-42", "no-op workflow: rail glyph is no-op; steps are ok, no-op, no-op",
               b.js("document.querySelector('.wf[data-wf=weekly-newsletter] .glyph').classList.contains('g-noop')")
               and step_glyphs == ["ok", "noop", "noop"], ",".join(step_glyphs))
-        blocks = b.js("[...document.querySelectorAll('.why')].map(e => [e.dataset.noop, e.querySelector('h2').firstChild.textContent, e.querySelector('p').textContent, e.querySelector(':scope > .mono').textContent])")
+        b.shot(out / "21-stack-noop-dark.png", full=False)
+        first_open = b.js("[...document.querySelectorAll('.why')].map(e => e.dataset.noop)")
+        row = b.js("[...document.querySelectorAll('.sumrow')].map(r => [r.querySelector('b').textContent, r.querySelector('.gist').textContent.slice(0, 22), r.className])")
+        check("AC-57", "two no-ops: the first is open, the second is one grey line",
+              first_open == ["script"] and row == [["Send did nothing", "The send step looked f", "sumrow noop"]], f"{first_open} {row}")
+        blocks = []
+        for sid in ("quality-gate", "send"):
+            b.click(f".step[data-step={sid}]")
+            b.settle(0.3)
+            blocks += b.js("[...document.querySelectorAll('.why')].map(e => [e.dataset.noop, e.querySelector('h2').firstChild.textContent, e.querySelector('p').textContent, e.querySelector(':scope > .mono').textContent])")
+        b.click(".step[data-step=quality-gate]")
+        b.settle(0.3)
+        lib(b)
+        _unused = b.js("[...document.querySelectorAll('.why')].map(e => [e.dataset.noop, e.querySelector('h2').firstChild.textContent, e.querySelector('p').textContent, e.querySelector(':scope > .mono').textContent])")
         check("AC-50", "a no-op with the script's own sentence gets a block with that sentence, as written",
               blocks[0] == ["script", "Quality gate did nothing", "The draft scored 61 of 100. The gate needs 75.", "quality_gate_not_met · reported by the script"], str(blocks[:1]))
         check("AC-51", "a no-op with no sentence of its own gets a written summary",

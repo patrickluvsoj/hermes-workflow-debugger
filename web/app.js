@@ -17,6 +17,7 @@ const I = {
   file: '<svg viewBox="0 0 16 16"><path d="M9.5 1.5h-6v13h9v-10zM9.5 1.5v3h3M5.5 8.5h5M5.5 11h5"/></svg>',
   session: '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>',
   folder: '<svg viewBox="0 0 18 18"><path d="M1.75 4.25h5l1.5 2h8v8.5H1.75z"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 14 14"><path d="M2 5l5 5 5-5"/></svg>',
   theme: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path class="solid" d="M8 2.5a5.5 5.5 0 0 1 0 11z"/></svg>'
 };
 const WORD = { failed: 'Failed', ok: 'OK', blocked: 'Blocked: an upstream step failed', paused: 'Paused',
@@ -24,7 +25,7 @@ const WORD = { failed: 'Failed', ok: 'OK', blocked: 'Blocked: an upstream step f
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const S = { data: null, lastGood: null, stale: false, error: null, wf: null, step: null, open: null,
+const S = { data: null, lastGood: null, stale: false, error: null, wf: null, step: null, open: null, sum: null,
   traces: {}, outputs: {}, picked: false };
 const Q = new URLSearchParams(location.search);
 
@@ -53,6 +54,9 @@ function schedule(text) {
 const curWf = () => S.data && S.data.workflows.find(w => w.id === S.wf);
 const curStep = w => w && w.steps.find(s => s.id === S.step);
 const badStep = w => w.steps.find(s => !s.paused && s.health === 'failed') || w.steps.find(s => !s.paused && s.health === 'missed') || w.steps.find(s => !s.paused && s.health === 'noop') || w.steps[0];
+// Reasons above the step strip that can be opened: a failed step, or a no-op with a block.
+// When a workflow has several, one is open and the rest are one line each (S.sum is the open one).
+const hasBlock = p => p.kind === 'failed' || (p.kind === 'noop' && (p.summary || {}).mode !== 'line');
 const traceKey = t => t.file || 'missed-' + t.time;
 // The script's own words for a run that did nothing: a fixed reason code and one sentence.
 // Shown as written. Set for a no-op, and for a no-op the step accepts (shown as ok).
@@ -63,7 +67,7 @@ const whyHTML = t => !didNothing(t) ? '' : [t.reason ? `<span class="code">${esc
 function pickWf(id, stepId, expand) {
   const w = S.data.workflows.find(x => x.id === id);
   if (!w) return;
-  S.wf = w.id;
+  S.wf = w.id; S.sum = null;
   const st = w.steps.find(s => s.id === stepId) || (w.steps.length ? badStep(w) : null);
   pickStep(st, expand);
 }
@@ -71,6 +75,8 @@ function pickStep(st, expand) {
   S.step = st ? st.id : null;
   S.open = null;
   if (!st) return;
+  const w = curWf();
+  if (w && w.problems.some(p => p.step_id === st.id && hasBlock(p))) S.sum = st.id;   // selecting a step opens its reason
   if (expand && st.latest && ['failed', 'missed'].includes(st.health)) openTrace(st, st.latest);
   loadTraces(st);
 }
@@ -147,7 +153,15 @@ function summaryBlocks(w) {
     return `<div class="why"><h2>${esc(w.file)} is not valid</h2>` +
       w.errors.map(e => `<p class="raw">${esc(e)}</p>`).join('') + `</div>`;
   }
-  return w.problems.map(p => {
+  if (!w.problems.length) return '';
+  const open = (w.problems.find(p => hasBlock(p) && p.step_id === S.sum) || w.problems.find(hasBlock) || {}).step_id;
+  return `<div class="stack">` + w.problems.map(p => {
+    if (hasBlock(p) && p.step_id !== open) {
+      const s = p.summary || {};
+      const gist = p.kind === 'failed' ? (s.text || s.first_error_line || 'no output') : (s.text || s.fallback || '');
+      return `<button class="sumrow ${p.kind}" data-sum="${esc(p.step_id)}" aria-expanded="false">${g(p.kind)}<b>${esc(p.title)} ${
+        p.kind === 'failed' ? 'failed' : 'did nothing'}</b><span class="gist">${esc(gist)}</span><span class="mono">${esc(when(p.time))}</span>${I.chev}</button>`;
+    }
     if (p.kind === 'missed') return `<div class="calm">${g('missed', null, true)}<span>${esc(p.title)}: scheduled ${esc(when(p.time, ' '))}, never ran.</span></div>`;
     const s = p.summary || {};
     if (p.kind === 'noop') {
@@ -164,7 +178,7 @@ function summaryBlocks(w) {
     if (s.status === 'ready') return `<div class="why" data-summary="ready">${head}<p>${esc(s.text)}</p><span class="mono">summarized ${esc(short(s.summarized_at))}</span></div>`;
     const note = s.status === 'unavailable' ? 'first error line · summary unavailable' : 'first error line · no summary yet';
     return `<div class="why" data-summary="${esc(s.status || 'pending')}">${head}<p class="raw">${esc(s.first_error_line || 'no output')}</p><span class="mono">${note}</span></div>`;
-  }).join('');
+  }).join('') + `</div>`;
 }
 
 function stepCaption(st) {
@@ -253,7 +267,7 @@ function render() {
   if (keep) { const el = document.querySelector(keep); if (el) el.focus({ preventScroll: true }); }
 }
 function focusKey(el) {
-  for (const a of ['data-wf', 'data-step']) if (el.hasAttribute(a)) return `[${a}="${CSS.escape(el.getAttribute(a))}"]`;
+  for (const a of ['data-wf', 'data-step', 'data-sum']) if (el.hasAttribute(a)) return `[${a}="${CSS.escape(el.getAttribute(a))}"]`;
   if (el.hasAttribute('data-open')) return `${el.classList.contains('tog') ? '.tog' : '.ib'}[data-open="${CSS.escape(el.getAttribute('data-open'))}"]`;
   if (el.hasAttribute('data-theme-toggle')) return '[data-theme-toggle]';
   return null;
@@ -264,11 +278,12 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
 function setTheme(theme) { document.documentElement.dataset.theme = theme; try { localStorage.setItem('wfd-theme', theme); } catch (e) { /* private mode */ } }
 
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-copy],[data-wf],[data-step],[data-open],[data-theme-toggle]'); if (!b) return;
+  const b = e.target.closest('[data-copy],[data-wf],[data-step],[data-sum],[data-open],[data-theme-toggle]'); if (!b) return;
   if (b.dataset.copy) { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).catch(() => {}); toast('copied ' + b.dataset.copy); return; }  // a link with data-copy still follows its href
   if (b.hasAttribute('data-theme-toggle')) { setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'); return; }
   const w = curWf();
   if (b.dataset.wf) pickWf(b.dataset.wf, null, true);
+  else if (b.dataset.sum) pickStep(w.steps.find(s => s.id === b.dataset.sum), true);   // opens the reason and selects its step
   else if (b.dataset.step) pickStep(w.steps.find(s => s.id === b.dataset.step), true);
   else if (b.dataset.open) {
     const st = curStep(w), list = S.traces[st.job_id] || [];
@@ -276,6 +291,10 @@ document.addEventListener('click', e => {
     if (S.open === b.dataset.open) S.open = null; else if (t) openTrace(st, t);
   }
   render();
+  if (b.dataset.sum) {   // the line that was clicked is now the open block: keep focus on its step
+    const el = document.querySelector(`.step[data-step="${CSS.escape(b.dataset.sum)}"]`);
+    if (el) el.focus({ preventScroll: true });
+  }
 });
 
 const tipEl = document.getElementById('tip');

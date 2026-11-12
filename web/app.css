@@ -74,7 +74,16 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
   border: 1px solid color-mix(in srgb, var(--destructive) 35%, transparent); border-left: 3px solid var(--destructive); }
 /* reason summary for a no-op: same block, grey edge, no tint. Red stays the only alarm */
 .why.quiet { background: none; border-color: var(--border); border-left: 3px solid var(--border-strong); }
-.why + .why, .why + .calm, .calm + .why, .calm + .calm { margin-top: 12px; }
+.stack > * + * { margin-top: 6px; }
+/* a reason that is not open: one line. Click to open it; the open one closes */
+.sumrow { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto 14px; gap: 10px; align-items: center; width: 100%;
+  padding: 8px 14px 8px 12px; border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 2px; }
+.sumrow.failed { background: color-mix(in srgb, var(--destructive) 6%, transparent);
+  border-color: color-mix(in srgb, var(--destructive) 35%, transparent); border-left-color: var(--destructive); }
+.sumrow:hover { background: var(--card); }
+.sumrow b { font-weight: 600; white-space: nowrap; }
+.sumrow .gist { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sumrow .chev { width: 14px; height: 14px; color: var(--text-3); }
 .why h2 { font-size: 19px; font-weight: 600; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .why h2 .mono { font-size: .8rem; }
 .why p { font-size: 14px; line-height: 1.5; margin-top: 5px; max-width: 80ch; overflow-wrap: anywhere; }
@@ -142,6 +151,8 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
+  .sumrow { grid-template-columns: 18px minmax(0, 1fr) 14px; }
+  .sumrow .gist, .sumrow .mono { display: none; }
   .rail { border-right: 0; border-bottom: 1px solid var(--border); position: static; height: auto; overflow: visible; }
   .wf[aria-current="true"] .desc { display: none; }
   .railfoot { margin-top: 0; }
