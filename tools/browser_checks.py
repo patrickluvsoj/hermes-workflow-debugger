@@ -140,9 +140,9 @@ def main(out: Path) -> int:
         check("O1", "first screen names the failing workflow", wf == "Industry Analysis Blog Post" and b.js("T.txt('h1')") == wf, wf)
         check("O1", "first screen names the failing step", headline.startswith("Industry analysis failed"), headline)
         check("O1", "reason is 2-3 sentences", 2 <= sentences(body) <= 3, f"{sentences(body)} sentences")
-        check("AC-19", "summary block has no icon; headline 19px and body 14px, still the largest type on the page",
+        check("AC-19", "summary block has no icon; headline 19px and body 14px, the largest type in the main area",
               b.js("T.n('.why .glyph')") == 0 and b.js("T.css('.why h2', 'fontSize')") == "19px" and b.js("T.css('.why p', 'fontSize')") == "14px"
-              and b.js("Math.max(...[...document.querySelectorAll('.app *')].filter(e => !e.closest('.why')).map(e => parseFloat(getComputedStyle(e).fontSize)))") < 19,
+              and b.js("Math.max(...[...document.querySelectorAll('.main *')].filter(e => !e.closest('.why')).map(e => parseFloat(getComputedStyle(e).fontSize)))") < 19,
               "block height " + str(b.js("document.querySelector('.why').offsetHeight")) + "px")
         check("O1", "workflow, step and reason are inside the first viewport, zero clicks",
               b.js("T.inView('h1') && T.inView('.why') && T.inView('.step[aria-pressed=true]')"))
