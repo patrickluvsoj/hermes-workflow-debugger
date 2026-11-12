@@ -7,6 +7,7 @@ const I = {
   failed: '<svg viewBox="0 0 18 18"><rect class="solid" x="1.5" y="1.5" width="15" height="15"/><path class="cut" d="M6 6l6 6M12 6l-6 6"/></svg>',
   ok: '<svg viewBox="0 0 18 18"><rect x="1.75" y="1.75" width="14.5" height="14.5"/><path d="M5.2 9.3l2.6 2.6 5-5.6"/></svg>',
   blocked: '<svg viewBox="0 0 18 18"><path d="M9 1.8l7.2 7.2L9 16.2 1.8 9z"/></svg>',
+  noop: '<svg viewBox="0 0 18 18"><rect x="1.75" y="1.75" width="14.5" height="14.5"/></svg>',
   paused: '<svg viewBox="0 0 18 18"><rect x="1.75" y="1.75" width="14.5" height="14.5"/><path class="bars" d="M7 5.8v6.4M11 5.8v6.4"/></svg>',
   missed: '<svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="6.8" stroke-dasharray="2.6 2.6"/></svg>',
   none: '<svg viewBox="0 0 18 18"><path d="M5 9h8"/></svg>',
@@ -19,7 +20,7 @@ const I = {
   theme: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path class="solid" d="M8 2.5a5.5 5.5 0 0 1 0 11z"/></svg>'
 };
 const WORD = { failed: 'Failed', ok: 'OK', blocked: 'Blocked: an upstream step failed', paused: 'Paused',
-  missed: 'Missed: scheduled, never ran', none: 'Did not run' };
+  missed: 'Missed: scheduled, never ran', noop: 'No-op: ran and did nothing', none: 'Did not run' };
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -51,8 +52,13 @@ function schedule(text) {
 
 const curWf = () => S.data && S.data.workflows.find(w => w.id === S.wf);
 const curStep = w => w && w.steps.find(s => s.id === S.step);
-const badStep = w => w.steps.find(s => !s.paused && s.health === 'failed') || w.steps.find(s => !s.paused && s.health === 'missed') || w.steps[0];
+const badStep = w => w.steps.find(s => !s.paused && s.health === 'failed') || w.steps.find(s => !s.paused && s.health === 'missed') || w.steps.find(s => !s.paused && s.health === 'noop') || w.steps[0];
 const traceKey = t => t.file || 'missed-' + t.time;
+// The script's own words for a run that did nothing: a fixed reason code and one sentence.
+// Shown as written. Set for a no-op, and for a no-op the step accepts (shown as ok).
+const didNothing = t => t && (t.state === 'noop' || (t.state === 'ok' && t.outcome === 'noop'));
+const whyHTML = t => !didNothing(t) ? '' : [t.reason ? `<span class="code">${esc(t.reason)}</span>` : '',
+  t.detail ? `<span class="said">${esc(t.detail)}</span>` : ''].filter(Boolean).join(' · ') || '<span class="said">did nothing</span>';
 
 function pickWf(id, stepId, expand) {
   const w = S.data.workflows.find(x => x.id === id);
@@ -114,8 +120,8 @@ async function loadOutput(jobId, file) {
 // ---- rendering ----------------------------------------------------------
 // Same rule as is_failure_line() in wfd/traces.py.
 const FAILED_STATUS = /^\*\*Status:\*\*.*(script failed|silent \(empty output\)|BLOCKED)/;
-const hit = line => { const s = line.trim(); return FAILED_STATUS.test(s) || /^(failure_reason=|\*\*Scanner result:\*\*|Script exited with code|Traceback)/.test(s) || /^[A-Za-z_][\w.]*(Error|Exception)\b/.test(s) || /^(ERROR|FATAL)\b/.test(s); };
-const outputHTML = text => text.split('\n').map(l => hit(l) ? `<span class="hit">${esc(l)}</span>` : esc(l)).join('\n');
+const hit = (line, failed) => { const s = line.trim(); return (failed && FAILED_STATUS.test(s)) || /^(failure_reason=|\*\*Scanner result:\*\*|Script exited with code|Traceback)/.test(s) || /^[A-Za-z_][\w.]*(Error|Exception)\b/.test(s) || /^(ERROR|FATAL)\b/.test(s); };
+const outputHTML = (text, failed) => text.split('\n').map(l => hit(l, failed) ? `<span class="hit">${esc(l)}</span>` : esc(l)).join('\n');
 
 function renderRail() {
   const d = S.data;
@@ -157,13 +163,15 @@ function stepCaption(st) {
   if (st.paused) parts.push('paused' + (st.paused_since ? ' since ' + day(parse(st.paused_since)) : ''));
   if (st.health === 'blocked') parts.push('blocked by ' + st.blocked_by.join(', '));
   if (st.health === 'missed') parts.push('missed ' + short(st.latest.time));
+  if (st.health === 'noop') parts.push('did nothing');
   parts.push(last);
   return parts.join(' · ');
 }
 // The selected step box grows to hold the step's description and its script line.
 function stepMore(st) {
   const script = st.source ? `${esc(st.source.script)} · changed ${esc(short(st.source.changed_at))}` : 'no script on file';
-  return (st.description ? `<span class="what">${esc(st.description)}</span>` : '') + `<span class="script mono">${script}</span>`;
+  const why = st.health === 'noop' && didNothing(st.latest) ? `<span class="why-noop mono">${whyHTML(st.latest)}</span>` : '';
+  return (st.description ? `<span class="what">${esc(st.description)}</span>` : '') + why + `<span class="script mono">${script}</span>`;
 }
 function pipeHTML(w) {
   return `<div class="pipe">` + w.steps.map((st, i) =>
@@ -186,14 +194,14 @@ function traceRow(st, t) {
   if (st.source) acts += `<a class="ib" href="/api/source/${encodeURIComponent(st.job_id)}" target="_blank" rel="noopener" aria-label="Open CRON source ${esc(st.source.script)}" data-tip="CRON source ${esc(st.source.script)}">${I.ext}</a>`;
   if (t.session_id) acts += `<a class="ib" href="hermes://open/sessions/${encodeURIComponent(t.session_id)}" data-copy="${esc(t.session_id)}" data-follow aria-label="Open session ${esc(t.session_id)} in Hermes and copy its ID" data-tip="Open session in Hermes · copies ID">${I.session}</a>`;
   let h = `<div class="t"><button class="tog" data-open="${esc(key)}" aria-expanded="${open}" aria-label="${esc(label)}">
-      ${g(t.state)}<span class="mono">${esc(when(t.time))}</span><span class="mono status${t.state === 'failed' ? ' bad' : ''}">${esc(t.status_line || '')}</span><span class="mono dur">${esc(dur(t.duration_s))}</span>
+      ${g(t.state)}<span class="mono">${esc(when(t.time))}</span>${didNothing(t) ? `<span class="mono status why-noop">${whyHTML(t)}</span>` : `<span class="mono status${t.state === 'failed' ? ' bad' : ''}">${esc(t.status_line || '')}</span>`}<span class="mono dur">${esc(dur(t.duration_s))}</span>
     </button><span class="act">${acts}</span></div>`;
   if (open) {
     const out = t.file ? S.outputs[st.job_id + '/' + t.file] : null;
     h += `<div class="x">` + (!t.file ? `<div class="empty">Scheduled, never ran. No output file.</div>`
       : out == null ? `<div class="empty mono">reading</div>`
       : out.error ? `<div class="empty">This output file could not be read.</div>`
-      : `<pre class="out${t.state === 'failed' ? ' error' : ''}" tabindex="0" aria-label="Output file ${esc(t.file)}">${outputHTML(out)}</pre>`) + `</div>`;
+      : `<pre class="out${t.state === 'failed' ? ' error' : ''}" tabindex="0" aria-label="Output file ${esc(t.file)}">${outputHTML(out, t.state === 'failed')}</pre>`) + `</div>`;
   }
   return h;
 }

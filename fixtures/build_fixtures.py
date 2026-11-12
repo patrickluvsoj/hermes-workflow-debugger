@@ -17,6 +17,9 @@ Scenarios
   F5 Weekly Store Sync               two independent failures with summaries; one step with no files
   F6 broken-example.yaml             scaffold that points at an unknown job
   F7 scaffolds-empty/                no scaffold files at all
+  F8 Weekly Newsletter               quality gate ran and did nothing (step_result line, no-op);
+                                     the send step is a no-op by a missing success pattern
+  F9 Inbox Tidy                      ok: one step is allowed to be silent, one accepts a no-op
 """
 from __future__ import annotations
 
@@ -107,6 +110,16 @@ smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepte
 """
 SILENT = "Script produced no output.\n"
 
+
+def result_line(outcome: str, reason: str | None = None, detail: str | None = None) -> str:
+    fields = {"schema": 1, "outcome": outcome}
+    if reason:
+        fields["reason"] = reason
+    if detail:
+        fields["detail"] = detail
+    return "step_result=" + json.dumps(fields)
+
+
 # job_id -> definition. Trace tuples: (time, kind, body, duration seconds)
 JOBS = [
     {"id": "a1f0c0de0001", "name": "Industry Watchlist Scout", "script": "industry-watchlist-scout.py",
@@ -163,6 +176,31 @@ JOBS = [
                 (at(11, 3, 2, 30, 21), "ok", ok_body("rows_written=96"), 20)]},
     {"id": "e5f0c0de0003", "name": "Store sync: archive", "script": "store-sync-archive.py",
      "schedule": ("cron", "0 3 1 * *"), "next": at(12, 1, 3), "changed": at(11, 5, 9, 0), "traces": []},
+    {"id": "a7f0c0de0001", "name": "Newsletter draft", "script": "newsletter-draft.py",
+     "schedule": ("cron", "0 6 * * 4"), "next": at(11, 19, 6), "changed": at(10, 12, 15, 2),
+     "traces": [(at(11, 12, 6, 3, 10), "ok", ok_body("draft=2026-11-12.md\nwords=1180\n" + result_line("done")), 188),
+                (at(11, 5, 6, 3, 2), "ok", ok_body("draft=2026-11-05.md\nwords=1342\n" + result_line("done")), 180)]},
+    {"id": "a7f0c0de0002", "name": "Newsletter quality gate", "script": "newsletter-quality-gate.py",
+     "schedule": ("cron", "0 7 * * 4"), "next": at(11, 19, 7), "changed": at(10, 12, 15, 4),
+     "traces": [(at(11, 12, 7, 0, 9), "ok", ok_body("draft=2026-11-12.md\nscore=61\n" + result_line(
+                    "noop", "quality_gate_not_met", "The draft scored 61 of 100. The gate needs 75.")), 8),
+                (at(11, 5, 7, 0, 8), "ok", ok_body("draft=2026-11-05.md\nscore=83\n" + result_line("done")), 7)]},
+    {"id": "a7f0c0de0003", "name": "Newsletter send", "script": "newsletter-send.sh",
+     "schedule": ("cron", "0 8 * * 4"), "next": at(11, 19, 8), "changed": at(9, 2, 10, 30),
+     "traces": [(at(11, 12, 8, 0, 4), "ok", ok_body("approved_draft=none\nrecipients=0"), 3),
+                (at(11, 5, 8, 0, 31), "ok", ok_body("approved_draft=2026-11-05.md\nsent=212"), 30)]},
+    {"id": "b8f0c0de0001", "name": "Inbox sweep", "script": "inbox-sweep.sh",
+     "schedule": ("cron", "0 5 * * *"), "next": at(11, 13, 5), "changed": at(8, 14, 9, 0),
+     "traces": [(at(11, 12, 5, 0, 2), "silent (empty output)", SILENT, 1),
+                (at(11, 11, 5, 0, 3), "ok", ok_body("archived=14"), 2),
+                (at(11, 10, 5, 0, 2), "silent (empty output)", SILENT, 1)]},
+    {"id": "b8f0c0de0002", "name": "Inbox report", "script": "inbox-report.py",
+     "schedule": ("cron", "30 5 * * *"), "next": at(11, 13, 5, 30), "changed": at(8, 14, 9, 5),
+     "traces": [(at(11, 12, 5, 30, 3), "ok", ok_body("unread=0\n" + result_line(
+                    "noop", "nothing_new_upstream", "No unread mail since the last report.")), 2),
+                (at(11, 11, 5, 30, 4), "ok", ok_body("unread=6\nreport=sent\n" + result_line("done")), 3),
+                (at(11, 10, 5, 30, 3), "ok", ok_body("unread=0\n" + result_line(
+                    "noop", "nothing_new_upstream", "No unread mail since the last report.")), 2)]},
     # Not named by any workflow file: the dashboard must not show it or serve its files.
     {"id": "f6f0c0de0001", "name": "Nightly notes backup", "script": "notes-backup.sh",
      "schedule": ("cron", "0 4 * * *"), "next": at(11, 13, 4), "changed": at(7, 1, 12, 0),
@@ -269,6 +307,49 @@ steps:
     description: Moves last month's exports to cold storage.
     job_id: e5f0c0de0003
     depends_on: []
+""",
+    "weekly-newsletter.yaml": """schema_version: 1
+id: weekly-newsletter
+title: Weekly Newsletter
+description: Drafts the newsletter, checks its quality and sends it.
+steps:
+  - id: draft
+    title: Draft
+    description: Writes the week's draft from the saved notes.
+    job_id: a7f0c0de0001
+    depends_on: []
+  - id: quality-gate
+    title: Quality gate
+    description: Scores the draft and approves it for sending if it passes.
+    job_id: a7f0c0de0002
+    depends_on: [draft]
+  - id: send
+    title: Send
+    description: Sends the approved draft to the list.
+    job_id: a7f0c0de0003
+    depends_on: [quality-gate]
+    expect:
+      success_when: '^sent=[1-9]'
+""",
+    "inbox-tidy.yaml": """schema_version: 1
+id: inbox-tidy
+title: Inbox Tidy
+description: Archives old mail every morning and reports what is unread.
+steps:
+  - id: sweep
+    title: Sweep
+    description: Archives mail older than 30 days. Prints nothing when there is none.
+    job_id: b8f0c0de0001
+    depends_on: []
+    expect:
+      allow_silent: true
+  - id: report
+    title: Report
+    description: Sends a short report when there is unread mail.
+    job_id: b8f0c0de0002
+    depends_on: [sweep]
+    expect:
+      noop: ok
 """,
     "broken-example.yaml": """schema_version: 1
 id: broken-example

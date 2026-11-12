@@ -37,6 +37,7 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .glyph svg { width: 18px; height: 18px; }
 .g-failed { color: var(--destructive); } .g-ok { color: var(--success); } .g-blocked { color: var(--warning); }
 .g-paused, .g-missed, .g-none { color: var(--text-3); }
+.g-noop { color: var(--text-2); }
 
 /* shell */
 .app { flex: 1; display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 0; }
@@ -114,6 +115,10 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .tog:focus-visible { outline-offset: -2px; }
 .tog .status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tog .status.bad { color: var(--destructive); }
+/* a run that did nothing: the script's reason code and its one sentence, as written */
+.why-noop .code { color: var(--text); }
+.tog .status.why-noop { white-space: normal; overflow: visible; padding-right: 12px; line-height: 1.5; }
+.step .why-noop { grid-column: 1 / -1; margin-top: 8px; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
 .tog .dur { text-align: right; }
 .act { display: flex; flex: none; padding: 0 0 0 4px; }
 .ib { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--border); margin-left: 4px; color: var(--text-2); }

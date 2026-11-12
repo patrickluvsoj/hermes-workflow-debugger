@@ -161,9 +161,11 @@ def main(out: Path) -> int:
         names = b.js("T.all('.wf .name')")
         check("AC-7", "rail lists problems first", names == [
             "Industry Analysis Blog Post", "Weekly Store Sync", "Weekly AI Analysis Publication", "Broken example",
-            "Google OAuth token refresh", "Hermes CRON error email report"], " > ".join(n.split()[0] for n in names))
+            "Google OAuth token refresh", "Weekly Newsletter", "Hermes CRON error email report", "Inbox Tidy"],
+              " > ".join(n.split()[0] for n in names))
         glyphs = b.js("[...document.querySelectorAll('.wf')].map(w => w.querySelector('.glyph').className.replace('glyph g-', ''))")
-        check("AC-7", "rail glyphs are failed, failed, failed, failed, missed, ok", glyphs == ["failed"] * 4 + ["missed", "ok"], ",".join(glyphs))
+        check("AC-7", "rail glyphs are failed, failed, failed, failed, missed, no-op, ok, ok",
+              glyphs == ["failed"] * 4 + ["missed", "noop", "ok", "ok"], ",".join(glyphs))
         broken = b.js("T.txt('.wf[data-wf=broken-example] .meta')")
         check("AC-3", "invalid file is in the rail as failed and names the field",
               glyphs[3] == "failed" and "steps[0].job_id" in broken, broken)
@@ -297,6 +299,73 @@ def main(out: Path) -> int:
         b.shot(out / "06-missed-single-step-dark.png", full=False)
         collect_contrast(b, "dark", "F3")
 
+        # ---------------- F8: no-op (AC-42, AC-43) ----------------
+        b.click(".wf[data-wf=weekly-newsletter]")
+        b.settle(0.4)
+        lib(b)
+        step_glyphs = b.js("[...document.querySelectorAll('.step')].map(x => x.querySelector('.glyph').className.replace('glyph g-', ''))")
+        check("AC-42", "no-op workflow: rail glyph is no-op; steps are ok, no-op, no-op",
+              b.js("document.querySelector('.wf[data-wf=weekly-newsletter] .glyph').classList.contains('g-noop')")
+              and step_glyphs == ["ok", "noop", "noop"], ",".join(step_glyphs))
+        check("AC-42", "a no-op gets no block above the step strip, and its downstream step is not blocked",
+              b.js("T.n('.why')") == 0 and b.js("T.n('.calm')") == 0 and b.js("T.n('.g-blocked')") == 0)
+        check("AC-42", "the first no-op step is selected; no trace is expanded",
+              b.js("T.txt('.step[aria-pressed=true] .name')") == "Quality gate" and b.js("T.n('pre.out')") == 0,
+              str(b.js("T.txt('.step[aria-pressed=true] .name')")))
+        b.hover(".step[aria-pressed=true] .g-noop")
+        tip = b.js("document.querySelector('#tip').textContent")
+        check("AC-42", "no-op glyph has its own tooltip", tip == "No-op: ran and did nothing", tip)
+        b.cdp("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": 2, "y": 898})
+        row = b.js("T.txt('.t .status')")
+        check("AC-43", "trace row shows the reason code and the detail without expanding",
+              row == "quality_gate_not_met · The draft scored 61 of 100. The gate needs 75." and b.js("T.n('pre.out')") == 0
+              and b.js("document.querySelector('.t .glyph').classList.contains('g-noop')"), str(row))
+        box = b.js("T.txt('.step[aria-pressed=true] .why-noop')")
+        check("AC-43", "selected step box shows the same reason", box == row, str(box))
+        check("AC-43", "the reason is not cut off: the row grows instead of clipping",
+              b.js("(() => { const e = document.querySelector('.t .status'); return e.scrollWidth <= e.clientWidth + 1; })()"))
+        check("AC-42", "no-op glyph is the grey outlined square (--text-2), not a state colour",
+              b.js("T.css('.t .g-noop', 'color')") == "rgb(145, 152, 161)", str(b.js("T.css('.t .g-noop', 'color')")))
+        b.shot(out / "18-noop-dark.png", full=False)
+        collect_contrast(b, "dark", "F8")
+        b.click(".step[data-step=send]")
+        b.settle(0.4)
+        lib(b)
+        check("AC-40", "no-op by a missing success pattern: no-op glyph, and the row says it did nothing",
+              b.js("document.querySelector('.t .glyph').classList.contains('g-noop')") and b.js("T.txt('.t .status')") == "did nothing",
+              str(b.js("T.txt('.t .status')")))
+        b.click(".t .tog")
+        b.wait("document.querySelector('pre.out')")
+        lib(b)
+        check("AC-42", "a no-op output block is not styled as an error",
+              not b.js("document.querySelector('pre.out').classList.contains('error')") and b.js("T.n('pre.out .hit')") == 0)
+        collect_contrast(b, "dark", "F8 send")
+
+        # ---------------- F9: allowed silence and accepted no-op (AC-38) ----------------
+        b.click(".wf[data-wf=inbox-tidy]")
+        b.settle(0.4)
+        lib(b)
+        step_glyphs = b.js("[...document.querySelectorAll('.step')].map(x => x.querySelector('.glyph').className.replace('glyph g-', ''))")
+        check("AC-38", "a step that allows silence and a step that accepts a no-op are both ok",
+              b.js("document.querySelector('.wf[data-wf=inbox-tidy] .glyph').classList.contains('g-ok')") and step_glyphs == ["ok", "ok"],
+              ",".join(step_glyphs))
+        rows = b.js("[...document.querySelectorAll('.t')].map(r => [r.querySelector('.glyph').className.replace('glyph g-', ''), r.querySelector('.status').textContent])")
+        check("AC-38", "allowed silent runs are ok rows that keep the raw status line, not red",
+              rows[0] == ["ok", "silent (empty output)"] and b.js("T.n('.t .status.bad')") == 0, str(rows[0]))
+        b.click(".t .tog")
+        b.wait("document.querySelector('pre.out')")
+        lib(b)
+        check("AC-38", "the output of an allowed silent run has no red line", b.js("T.n('pre.out .hit')") == 0)
+        b.click(".step[data-step=report]")
+        b.settle(0.4)
+        lib(b)
+        rows = b.js("[...document.querySelectorAll('.t')].map(r => [r.querySelector('.glyph').className.replace('glyph g-', ''), r.querySelector('.status').textContent])")
+        check("AC-43", "an accepted no-op is an ok row that still shows its reason",
+              rows[0] == ["ok", "nothing_new_upstream · No unread mail since the last report."] and rows[1][1] == "", str(rows[:2]))
+        check("AC-43", "the step box shows no reason when the no-op is accepted", b.js("T.n('.step .why-noop')") == 0)
+        b.shot(out / "19-accepted-noop-dark.png", full=False)
+        collect_contrast(b, "dark", "F9")
+
         # ---------------- F4: no failure (AC-19, AC-9) ----------------
         b.click(".wf[data-wf=hermes-cron-error-email-report]")
         b.settle(0.4)
@@ -337,7 +406,7 @@ def main(out: Path) -> int:
         # ---------------- AC-24: none of the five NOs ----------------
         page_text = ""
         for wf_id in ["industry-analysis-blog-post", "weekly-store-sync", "weekly-ai-analysis-publication", "broken-example",
-                      "google-oauth-token-refresh", "hermes-cron-error-email-report"]:
+                      "google-oauth-token-refresh", "hermes-cron-error-email-report", "weekly-newsletter", "inbox-tidy"]:
             b.click(f".wf[data-wf={wf_id}]")
             b.settle(0.3)
             page_text += " " + b.js("document.querySelector('.app').innerText + ' ' + [...document.querySelectorAll('[data-tip]')].map(e => e.dataset.tip).join(' ')")
@@ -362,7 +431,7 @@ def main(out: Path) -> int:
               b.js("T.css('body', 'backgroundColor')") == "rgb(255, 255, 255)" and b.js("T.css('.rail', 'backgroundColor')") == "rgb(246, 248, 250)")
         b.shot(out / "09-first-screen-light.png", full=False)
         for wf_id in ["industry-analysis-blog-post", "weekly-store-sync", "weekly-ai-analysis-publication", "broken-example",
-                      "google-oauth-token-refresh", "hermes-cron-error-email-report"]:
+                      "google-oauth-token-refresh", "hermes-cron-error-email-report", "weekly-newsletter", "inbox-tidy"]:
             b.click(f".wf[data-wf={wf_id}]")
             b.settle(0.35)
             lib(b)
@@ -398,11 +467,12 @@ def main(out: Path) -> int:
         goto(b, base + "/")
         b.wait("document.querySelector('pre.out')")
         lib(b)
-        shapes = b.js("(() => { const out = {}; for (const s of ['failed','ok','blocked','missed','paused','none']) { const d = document.createElement('div'); d.innerHTML = I[s]; out[s] = d.firstChild.innerHTML; } return out; })()")
-        check("AC-27", "six states, six different glyph shapes", len(set(shapes.values())) == 6, ", ".join(shapes))
+        shapes = b.js("(() => { const out = {}; for (const s of ['failed','ok','blocked','missed','paused','none','noop']) { const d = document.createElement('div'); d.innerHTML = I[s]; out[s] = d.firstChild.innerHTML; } return out; })()")
+        check("AC-27", "seven states, seven different glyph shapes", len(set(shapes.values())) == 7, ", ".join(shapes))
         seen_states = set()
         hover_fail, hovered = [], 0
-        for wf_id in ["industry-analysis-blog-post", "weekly-store-sync", "weekly-ai-analysis-publication", "google-oauth-token-refresh"]:
+        for wf_id in ["industry-analysis-blog-post", "weekly-store-sync", "weekly-ai-analysis-publication", "google-oauth-token-refresh",
+                      "weekly-newsletter"]:
             b.click(f".wf[data-wf={wf_id}]")
             b.settle(0.35)
             lib(b)
@@ -419,7 +489,7 @@ def main(out: Path) -> int:
                     hover_fail.append(f"{wf_id}:{expected!r} got {shown!r}")
                 b.js("document.querySelector('[data-probe]').removeAttribute('data-probe')")
         check("AC-27", "every glyph and icon button shows its tooltip on hover", not hover_fail, f"{hovered} elements hovered" if not hover_fail else "; ".join(hover_fail[:4]))
-        check("AC-27", "the hover pass covered all six glyph states (failed, ok, blocked, missed, paused, did not run)", seen_states == {"g-failed", "g-ok", "g-blocked", "g-missed", "g-paused", "g-none"}, ",".join(sorted(seen_states)))
+        check("AC-27", "the hover pass covered all seven glyph states (failed, ok, blocked, missed, paused, did not run, no-op)", seen_states == {"g-failed", "g-ok", "g-blocked", "g-missed", "g-paused", "g-none", "g-noop"}, ",".join(sorted(seen_states)))
         b.click(".wf[data-wf=weekly-store-sync]")
         b.settle(0.3)
         b.hover(".step[data-step=archive] .glyph")
@@ -515,7 +585,7 @@ def main(out: Path) -> int:
         lib(b)
         foot = b.js("T.txt('#foot-text')")
         check("AC-12", "poll fails: data is kept and the footer shows the last good read time",
-              foot == "example · last read 10:42 · fixtures" and b.js("T.n('.wf')") == 6 and b.js("T.n('pre.out')") == 1, foot)
+              foot == "example · last read 10:42 · fixtures" and b.js("T.n('.wf')") == 8 and b.js("T.n('pre.out')") == 1, foot)
         b.hover(".dot")
         check("AC-27", "the stale marker has a tooltip", b.js("document.querySelector('#tip').textContent") == "Not updating: the server did not answer")
         b.shot(out / "16-poll-failed-dark.png", full=False)
