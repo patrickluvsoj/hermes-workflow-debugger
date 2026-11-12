@@ -152,5 +152,6 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
   .step, .step[aria-pressed="true"] { width: 100%; max-width: none; }
   .tog { grid-template-columns: 30px 150px minmax(0, 1fr); }
   .tog .dur, .h { display: none; }
+  .tog .status.why-noop { grid-column: 2 / -1; margin-top: 2px; padding-right: 0; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
