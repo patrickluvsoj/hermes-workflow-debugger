@@ -163,6 +163,10 @@ JOBS = [
                 (at(11, 3, 2, 30, 21), "ok", ok_body("rows_written=96"), 20)]},
     {"id": "e5f0c0de0003", "name": "Store sync: archive", "script": "store-sync-archive.py",
      "schedule": ("cron", "0 3 1 * *"), "next": at(12, 1, 3), "changed": at(11, 5, 9, 0), "traces": []},
+    # Not named by any workflow file: the dashboard must not show it or serve its files.
+    {"id": "f6f0c0de0001", "name": "Nightly notes backup", "script": "notes-backup.sh",
+     "schedule": ("cron", "0 4 * * *"), "next": at(11, 13, 4), "changed": at(7, 1, 12, 0),
+     "traces": [(at(11, 12, 4, 0, 9), "ok", ok_body("archived=214 files"), 8)]},
 ]
 
 INCIDENTS = {  # (job_id, trace time) -> error_sig
