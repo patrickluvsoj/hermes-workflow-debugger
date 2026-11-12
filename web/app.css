@@ -105,7 +105,7 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .traces { margin-top: 8px; border-top: 1px solid var(--border); }
 .t { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .t:hover { background: var(--card); }
-.tog { flex: 1; min-width: 0; display: grid; grid-template-columns: 30px 150px minmax(0, 1fr) 72px; align-items: center; padding: 8px 12px 8px 0; }
+.tog { flex: 1; min-width: 0; display: grid; grid-template-columns: 30px 150px minmax(0, 1fr) 72px; align-items: center; padding: 13px 12px 13px 0; }
 .tog:focus-visible { outline-offset: -2px; }
 .tog .status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tog .status.bad { color: var(--destructive); }
