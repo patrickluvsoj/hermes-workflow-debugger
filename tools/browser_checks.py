@@ -92,6 +92,8 @@ def lib(b: Browser) -> None:
 
 
 def goto(b: Browser, url: str, wait_main: bool = True) -> None:
+    if "theme=" not in url:  # the checks below were written against the dark tokens; light is covered separately
+        url += ("&" if "?" in url else "?") + "theme=dark"
     if "poll=" not in url:  # keep the 30-second poll from re-rendering the page in the middle of a check
         url += ("&" if "?" in url else "?") + "poll=600000"
     b.goto(url)
@@ -120,6 +122,10 @@ def main(out: Path) -> int:
             contrast.setdefault(theme, {}).setdefault(key, {**value, "where": where})
 
     with Browser(1440, 900) as b:
+        # ---------------- default theme ----------------
+        b.goto(base + "/")
+        check("AC-26", "light is the default theme when nothing is chosen",
+              b.js("document.documentElement.dataset.theme") == "light" and b.js("getComputedStyle(document.body).backgroundColor") == "rgb(255, 255, 255)")
         # ---------------- first screen, zero clicks (O1, AC-8) ----------------
         goto(b, base + "/")
         b.wait("document.querySelector('pre.out')")
