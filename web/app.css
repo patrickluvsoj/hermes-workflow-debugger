@@ -61,24 +61,23 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .dot { width: 7px; height: 7px; background: var(--success); flex: none; }
 .dot.stale { background: transparent; border: 1.5px solid var(--warning); width: 9px; height: 9px; transform: rotate(45deg); }
 
-.main { min-width: 0; padding: 22px 32px 48px; max-width: 1180px; }
+.main { min-width: 0; padding: 22px 32px 24px; max-width: 1180px; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
+.main > * { flex: none; }
 h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .lede { color: var(--text-2); margin-top: 4px; max-width: 70ch; font-size: .93rem; }
 .section { margin-top: 22px; }
 .ib, .detail, .out, .why, .step, .calm { border-radius: 2px; }
 
 /* error summary */
-.why { display: grid; grid-template-columns: 26px 1fr; gap: 4px 14px; padding: 20px 24px 20px 19px;
+.why { padding: 16px 20px 16px 17px;
   background: color-mix(in srgb, var(--destructive) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--destructive) 35%, transparent); border-left: 3px solid var(--destructive); }
 .why + .why, .why + .calm, .calm + .why, .calm + .calm { margin-top: 12px; }
-.why > .glyph, .why > .glyph svg { width: 26px; height: 26px; }
-.why > .glyph { margin-top: 4px; }
-.why h2 { font-size: 24px; font-weight: 600; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
-.why h2 .mono { font-size: .9rem; }
-.why p { grid-column: 2; font-size: 17px; line-height: 1.5; margin-top: 6px; max-width: 72ch; overflow-wrap: anywhere; }
-.why p.raw { font-family: var(--f-mono); font-size: 14px; line-height: 1.6; }
-.why > .mono { grid-column: 2; display: block; margin-top: 8px; overflow-wrap: anywhere; }
+.why h2 { font-size: 19px; font-weight: 600; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.why h2 .mono { font-size: .8rem; }
+.why p { font-size: 14px; line-height: 1.5; margin-top: 5px; max-width: 80ch; overflow-wrap: anywhere; }
+.why p.raw { font-family: var(--f-mono); font-size: 12px; line-height: 1.6; }
+.why > .mono { display: block; margin-top: 6px; overflow-wrap: anywhere; }
 .calm { display: flex; align-items: center; gap: 10px; border-left: 3px solid var(--border-strong); padding: 10px 16px; color: var(--text-2); }
 .calm .path { color: var(--text); overflow-wrap: anywhere; }
 
@@ -106,8 +105,10 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
 .gap { width: 12px; height: 12px; flex: none; }
 
 /* selected step: source line and trace list */
-#detail { margin-top: 26px; }
-.traces { border-top: 1px solid var(--border); }
+/* The trace list takes the rest of the window and scrolls inside it. */
+.main > #detail { margin-top: 26px; flex: 1 1 auto; min-height: 320px; display: flex; flex-direction: column; }
+.traces { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.traces > :last-child { border-bottom: 0; }
 .t { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .t:hover { background: var(--card); }
 .tog { flex: 1; min-width: 0; display: grid; grid-template-columns: 30px 150px minmax(0, 1fr) 72px; align-items: center; padding: 13px 12px 13px 0; }
@@ -138,7 +139,9 @@ h1 { font-weight: 600; font-size: 15px; line-height: 1.25; }
   .rail { border-right: 0; border-bottom: 1px solid var(--border); position: static; height: auto; overflow: visible; }
   .wf[aria-current="true"] .desc { display: none; }
   .railfoot { margin-top: 0; }
-  .main { padding: 18px 16px 40px; }
+  .main { padding: 18px 16px 40px; height: auto; overflow: visible; display: block; }
+  .main > #detail { display: block; min-height: 0; }
+  .traces { max-height: 70vh; }
   .pipe { flex-direction: column; overflow-x: visible; }
   .pipe > .step { flex: 0 0 auto; }
   .arrow { width: 100%; height: 22px; } .arrow svg { transform: rotate(90deg); }

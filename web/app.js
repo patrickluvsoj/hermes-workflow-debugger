@@ -138,13 +138,13 @@ function renderRail() {
 
 function summaryBlocks(w) {
   if (w.invalid) {
-    return `<div class="why">${g('failed', 'Failed: workflow file is not valid', true)}<h2>${esc(w.file)} is not valid</h2>` +
+    return `<div class="why"><h2>${esc(w.file)} is not valid</h2>` +
       w.errors.map(e => `<p class="raw">${esc(e)}</p>`).join('') + `</div>`;
   }
   return w.problems.map(p => {
     if (p.kind === 'missed') return `<div class="calm">${g('missed', null, true)}<span>${esc(p.title)}: scheduled ${esc(when(p.time, ' '))}, never ran.</span></div>`;
     const s = p.summary || {};
-    const head = `${g('failed', null, true)}<h2>${esc(p.title)} failed<span class="mono">${esc(when(p.time))}</span></h2>`;
+    const head = `<h2>${esc(p.title)} failed<span class="mono">${esc(when(p.time))}</span></h2>`;
     if (s.status === 'ready') return `<div class="why" data-summary="ready">${head}<p>${esc(s.text)}</p><span class="mono">summarized ${esc(short(s.summarized_at))}</span></div>`;
     const note = s.status === 'unavailable' ? 'first error line · summary unavailable' : 'first error line · no summary yet';
     return `<div class="why" data-summary="${esc(s.status || 'pending')}">${head}<p class="raw">${esc(s.first_error_line || 'no output')}</p><span class="mono">${note}</span></div>`;
@@ -226,7 +226,11 @@ function renderMain() {
 function render() {
   const keep = document.activeElement && document.activeElement.closest ? focusKey(document.activeElement) : null;
   const scroll = [...document.querySelectorAll('pre.out')].map(p => p.scrollTop);
+  const list = document.querySelector('.traces'), listKey = S.wf + '/' + S.step;
+  const listTop = list && render.listKey === listKey ? list.scrollTop : 0;
   renderRail(); renderMain();
+  render.listKey = listKey;
+  if (listTop && document.querySelector('.traces')) document.querySelector('.traces').scrollTop = listTop;
   document.querySelectorAll('pre.out').forEach((p, i) => { if (scroll[i]) p.scrollTop = scroll[i]; });
   if (keep) { const el = document.querySelector(keep); if (el) el.focus({ preventScroll: true }); }
 }

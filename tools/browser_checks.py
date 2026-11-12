@@ -136,6 +136,10 @@ def main(out: Path) -> int:
         check("O1", "first screen names the failing workflow", wf == "Industry Analysis Blog Post" and b.js("T.txt('h1')") == wf, wf)
         check("O1", "first screen names the failing step", headline.startswith("Industry analysis failed"), headline)
         check("O1", "reason is 2-3 sentences", 2 <= sentences(body) <= 3, f"{sentences(body)} sentences")
+        check("AC-19", "summary block has no icon; headline 19px and body 14px, still the largest type on the page",
+              b.js("T.n('.why .glyph')") == 0 and b.js("T.css('.why h2', 'fontSize')") == "19px" and b.js("T.css('.why p', 'fontSize')") == "14px"
+              and b.js("Math.max(...[...document.querySelectorAll('.app *')].filter(e => !e.closest('.why')).map(e => parseFloat(getComputedStyle(e).fontSize)))") < 19,
+              "block height " + str(b.js("document.querySelector('.why').offsetHeight")) + "px")
         check("O1", "workflow, step and reason are inside the first viewport, zero clicks",
               b.js("T.inView('h1') && T.inView('.why') && T.inView('.step[aria-pressed=true]')"))
         check("AC-8", "first failing workflow is selected", b.js("document.querySelector('.wf').getAttribute('aria-current')") == "true")
@@ -296,6 +300,16 @@ def main(out: Path) -> int:
         check("AC-19", "no failure: no block, the step strip moves up under the title",
               b.js("T.n('.why')") == 0 and b.js("T.n('#summary')") == 0
               and b.js("document.querySelector('.pipe').getBoundingClientRect().top - document.querySelector('.lede').getBoundingClientRect().bottom") < 30)
+        b.resize(1440, 560)
+        b.settle(0.3)
+        check("AC-10", "the trace list scrolls inside its own area and keeps its place across a re-render",
+              b.js("(() => { const t = document.querySelector('.traces'); t.scrollTop = 120; render(); const u = document.querySelector('.traces'); "
+                   "return getComputedStyle(u).overflowY === 'auto' && u.scrollHeight > u.clientHeight && u.scrollTop === 120 && document.documentElement.scrollHeight <= innerHeight; })()"),
+              b.js("document.querySelector('.traces').scrollHeight + ' tall in ' + document.querySelector('.traces').clientHeight"))
+        b.shot(out / "07b-trace-list-scrolls-dark.png", full=False)
+        b.js("document.querySelector('.traces').scrollTop = 0; null")
+        b.resize(1440, 900)
+        b.settle(0.3)
         states = b.js("[...document.querySelectorAll('.t .tog .glyph')].map(g => g.className.replace('glyph g-', ''))")
         check("AC-9", "old failed and missed traces stay in the list under an ok step",
               states == ["ok", "ok", "ok", "missed", "ok", "failed", "ok", "failed", "ok", "ok"], ",".join(states))
