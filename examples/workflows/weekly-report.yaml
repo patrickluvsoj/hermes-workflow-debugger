@@ -1,0 +1,15 @@
+schema_version: 1
+id: weekly-report
+title: Weekly Report
+description: Drafts a weekly report and publishes it.
+steps:
+  - id: draft
+    title: Draft
+    description: Gathers the week's notes and writes the report.
+    job_id: 0123456789ab
+    depends_on: []
+  - id: publish
+    title: Publish
+    description: Publishes the report if the draft succeeded.
+    job_id: ba9876543210
+    depends_on: [draft]

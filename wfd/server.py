@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from . import scaffold
-from .hermes_reader import JOB_ID_RE, OUTPUT_NAME_RE
+from .hermes_reader import JOB_ID_RE, OUTPUT_NAME_RE, hermes_font
 from .state import step_traces
 
 HOST = "127.0.0.1"
@@ -77,8 +77,12 @@ def route(context, path: str):
         name, kind = STATIC[path]
         return kind, (WEB / name).read_bytes()
     font = FONT_RE.match(path)
-    if font and (WEB / "fonts" / font.group(1)).is_file():
-        return "font/" + font.group(2), (WEB / "fonts" / font.group(1)).read_bytes()
+    if font:
+        path = WEB / "fonts" / font.group(1)
+        if not path.is_file():
+            path = hermes_font(font.group(1))
+        if path is not None:
+            return "font/" + font.group(2), path.read_bytes()
     raise NotFound
 
 

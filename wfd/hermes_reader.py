@@ -23,6 +23,17 @@ def default_profile_root() -> Path:
     return Path(os.environ.get("WFD_PROFILE_ROOT") or Path.home() / ".hermes" / "profiles" / "daily")
 
 
+def hermes_font(name: str) -> Path | None:
+    """A font file from the local Hermes install. The wordmark font is Hermes's own and is
+    not shipped with this repository; when Hermes is not installed the page falls back to
+    the system font."""
+    if not re.match(r"^[A-Za-z0-9_-]+\.woff2$", name):
+        return None
+    root = Path(os.environ.get("WFD_HERMES_FONTS") or Path.home() / ".hermes" / "hermes-agent" / "hermes_cli" / "web_dist" / "fonts")
+    path = root / name
+    return path if path.is_file() else None
+
+
 def to_local(value) -> datetime | None:
     """Parse an ISO time into a naive local datetime. Naive input is taken as local."""
     if not value:

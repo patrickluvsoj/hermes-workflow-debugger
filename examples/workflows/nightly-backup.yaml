@@ -1,0 +1,10 @@
+schema_version: 1
+id: nightly-backup
+title: Nightly Backup
+description: Copies the notes folder to backup storage every night.
+steps:
+  - id: backup
+    title: Backup
+    description: Archives the notes folder and uploads the archive.
+    job_id: 00aa11bb22cc
+    depends_on: []

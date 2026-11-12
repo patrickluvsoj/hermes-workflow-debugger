@@ -5,8 +5,12 @@ import hashlib
 import re
 from datetime import datetime
 
+# "silent (empty output)" is a run that exited 0 and printed nothing. Hermes records it as a
+# success. The debugger counts it as failed, because every step it has been used with is
+# expected to print something. It cannot tell a step that is allowed to be quiet from one
+# that is not. See README, "Known limits".
 FAILED_STATUSES = ("script failed", "silent (empty output)", "BLOCKED")
-KNOWN_OK_STATUSES = ("\u2705 Published",)
+KNOWN_OK_STATUSES = ("\u2705 Published", "silent (wakeAgent=false)")  # the second is a script choosing to stay quiet
 
 _HEADER_KEY = re.compile(r"^\*\*([A-Za-z ]+):\*\*\s*(.*)$")
 _SESSION = re.compile(r"session_id=((?:\d{8}_\d{6}_[0-9a-f]{4,})|(?:local-[0-9a-f]{16,}))")
