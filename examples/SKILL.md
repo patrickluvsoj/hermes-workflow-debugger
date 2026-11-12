@@ -31,6 +31,11 @@ steps:
     title: Publish
     job_id: ba9876543210
     depends_on: [draft]
+    expect:                  # optional: what the step should produce
+      allow_silent: false    # true: a run that prints nothing is ok
+      noop: flag             # ok: a run that did nothing counts as ok
+      noop_when: ['^nothing to publish']   # only for scripts with no step_result line
+      success_when: '^published='          # only for scripts with no step_result line
 ```
 
 - A step depends only on the steps named in its own `depends_on`. Follow the chain upward for indirect dependencies.
@@ -40,7 +45,7 @@ steps:
 
 The files say how workflows are built, not how they are doing. For current state, run `wfd status` from the debugger's virtualenv (for example `~/Code/hermes-workflow-debugger/.venv/bin/wfd status`).
 
-It prints every workflow, worst first, with each step's health: `FAILED`, `MISSED`, `blocked`, `ok` or `did not run`. A failed step shows its raw status line and either a short summary or the first error line. `blocked` means an upstream step failed or was missed and this step has not run since. `[paused]` is separate from health. Add `--json` for the same data as JSON.
+It prints every workflow, worst first, with each step's health: `FAILED`, `MISSED`, `blocked`, `no-op`, `ok` or `did not run`. `no-op` means the step ran without error and did nothing; the line after it gives the script's own reason. A failed step shows its raw status line and either a short summary or the first error line. `blocked` means an upstream step failed or was missed and this step has not run since. `[paused]` is separate from health. Add `--json` for the same data as JSON.
 
 Report what the command prints. If it cannot run, say so; do not guess the state.
 

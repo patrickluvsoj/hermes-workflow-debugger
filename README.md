@@ -83,11 +83,60 @@ steps:
 | `steps[].description` | no | One sentence on what the step does |
 | `steps[].job_id` | yes | ID of the CRON job that runs this step. Each job can be used once per file |
 | `steps[].depends_on` | no | List of step `id`s that must have succeeded first. Leave empty for a first step |
+| `steps[].expect` | no | What the step is expected to produce. See the next section |
 
 - Find a job's ID with `hermes cron list`.
 - A dependency names another step's `id`, not its job ID. A step with two entries in `depends_on` waits on both.
 - Check the file with `.venv/bin/wfd status`. It prints each workflow and step, and exits with code 1 if a file is not valid.
 - A file with a mistake is not skipped. It appears in the dashboard as failed, with the field at fault, for example `steps[1].job_id: job 'ba9876543210' is not in cron/jobs.json`.
+
+## Say what a step should produce (optional)
+
+A CRON can exit cleanly and still do nothing: a publish step that finds nothing to publish, for example. The dashboard calls that a no-op and shows it with its own glyph, between blocked and ok. The script reports what happened. The scaffold says what was expected.
+
+**In the script**, print one line per run:
+
+```
+step_result={"schema": 1, "outcome": "noop", "reason": "quality_gate_not_met", "detail": "The draft scored 61 of 100. The gate needs 75."}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `schema` | yes | `1` |
+| `outcome` | yes | `done`: the step did its job. `noop`: it ran correctly and chose to do nothing. `failed`: it could not do its job |
+| `reason` | for `noop` and `failed` | A short fixed code. The same cause gets the same code on every run |
+| `detail` | no | One plain sentence: which check was not met, with numbers. No secrets |
+
+- The dashboard shows `reason` and `detail` on the trace row as written.
+- If a run prints the line more than once, the last one counts. A line that is not valid is ignored.
+- A script that prints `failed` should also exit non-zero, so Hermes records the failure.
+- Hermes's own status comes first. A run Hermes marks `script failed` is failed whatever the line says.
+
+**In the scaffold**, add `expect` to a step:
+
+```yaml
+  - id: publish
+    title: Publish
+    job_id: ba9876543210
+    depends_on: [draft]
+    expect:
+      allow_silent: false
+      noop: flag
+      noop_when: ['^nothing to publish']
+      success_when: '^published='
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `allow_silent` | `false` | `true`: a run that prints nothing (`silent (empty output)`) is ok. Otherwise it is failed |
+| `noop` | `flag` | `flag`: a no-op run is shown as no-op. `ok`: it is shown as ok, for a step that is often idle |
+| `noop_when` | none | List of regular expressions. A match anywhere in the output means no-op |
+| `success_when` | none | One regular expression. If it matches nothing in the output, the run is a no-op |
+
+- `noop_when` and `success_when` are for scripts that do not print a `step_result` line. A run that prints the line ignores them.
+- Patterns are matched per line (`^` is the start of a line). They copy the script's wording, so update them when the script changes.
+- A step with no `expect` block behaves as before: silent is failed, and anything that exits cleanly is ok.
+- A no-op step does not block the steps after it.
 
 ## Error summaries (optional)
 
@@ -102,8 +151,8 @@ If the checkout is not in `~/Code/hermes-workflow-debugger`, set `WFD_REPO` in t
 
 ## Known limits
 
-- A run that exits cleanly but prints nothing (`silent (empty output)`) is shown as failed. Hermes itself records it as a success. The debugger cannot tell a step that is allowed to be quiet from one that is not.
-- A run that succeeds but does nothing useful is shown as ok.
+- A `step_result` line is the script's own claim. A script that prints `done` and produced bad output is shown as ok. The debugger does not check that a file or a commit exists.
+- A step with no `expect` block and no `step_result` line is ok whenever it exits cleanly, even if it did nothing. A run that prints nothing is failed unless the step sets `allow_silent`.
 - Missed runs in the past are found only for jobs on a cron expression, and only as far back as Hermes keeps execution records (about ten days).
 - Workflows that branch are drawn as a single row of steps.
 
