@@ -32,11 +32,15 @@ class Context:
 
     def __post_init__(self):
         self.reader = HermesReader(self.profile_root, self.data_dir)
-        self.traces = TraceStore(self.reader, on_unknown=self._unknown_status)
+        self.traces = TraceStore(self.reader, on_unknown=self._unknown_status, on_bad_result=self._bad_result)
 
     @staticmethod
     def _unknown_status(job_id: str, name: str, status: str) -> None:
         print(f"wfd: unrecognised status line {status!r} in {job_id}/{name}; treated as ok", file=sys.stderr)
+
+    @staticmethod
+    def _bad_result(job_id: str, name: str, problem: str) -> None:
+        print(f"wfd: {problem} in {job_id}/{name}; ignored", file=sys.stderr)
 
     def now(self) -> datetime:
         return self.fixed_now or datetime.now()

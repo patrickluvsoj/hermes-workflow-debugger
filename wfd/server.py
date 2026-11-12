@@ -32,25 +32,34 @@ class NotFound(Exception):
     pass
 
 
-def scaffolded_jobs(context) -> dict[str, dict]:
-    """job_id -> job record, for jobs named by a valid workflow file. Nothing
-    else can be read through the API."""
+def scaffolded_steps(context) -> dict[str, tuple[dict, dict]]:
+    """job_id -> (job record, the step's expectation), for jobs named by a valid
+    workflow file. Nothing else can be read through the API. A job named by two
+    files keeps the expectation of the first."""
     jobs = context.reader.jobs()
     allowed = {}
     for workflow in scaffold.load_dir(context.scaffold_dir, jobs):
         if not workflow["invalid"]:
             for step in workflow["steps"]:
-                allowed[step["job_id"]] = jobs[step["job_id"]]
+                allowed.setdefault(step["job_id"], (jobs[step["job_id"]], step["expect"]))
     return allowed
 
 
-def _job(context, job_id: str) -> dict:
+def scaffolded_jobs(context) -> dict[str, dict]:
+    return {job_id: job for job_id, (job, _expect) in scaffolded_steps(context).items()}
+
+
+def _step(context, job_id: str) -> tuple[dict, dict]:
     if not JOB_ID_RE.match(job_id):
         raise NotFound
-    job = scaffolded_jobs(context).get(job_id)
-    if job is None:
+    found = scaffolded_steps(context).get(job_id)
+    if found is None:
         raise NotFound
-    return job
+    return found
+
+
+def _job(context, job_id: str) -> dict:
+    return _step(context, job_id)[0]
 
 
 def route(context, path: str):
@@ -59,8 +68,8 @@ def route(context, path: str):
         return "application/json", json.dumps(context.state()).encode()
     parts = path.split("/")
     if len(parts) == 5 and parts[:3] == ["", "api", "steps"] and parts[4] == "traces":
-        job = _job(context, parts[3])
-        traces = step_traces(context.reader, context.traces, job, parts[3], context.now())
+        job, expect = _step(context, parts[3])
+        traces = step_traces(context.reader, context.traces, job, parts[3], context.now(), expect)
         return "application/json", json.dumps({"job_id": parts[3], "traces": traces}).encode()
     if len(parts) == 5 and parts[:3] == ["", "api", "traces"]:
         _job(context, parts[3])

@@ -7,7 +7,12 @@ import sys
 
 from .context import build_context
 
-LABEL = {"failed": "FAILED", "missed": "MISSED", "blocked": "blocked", "ok": "ok", "none": "did not run"}
+LABEL = {"failed": "FAILED", "missed": "MISSED", "blocked": "blocked", "noop": "no-op", "ok": "ok", "none": "did not run"}
+
+
+def _why(trace) -> str:
+    """The script's own reason for a no-op, as written."""
+    return ": ".join(part for part in (trace.get("reason"), trace.get("detail")) if part)
 
 
 def _when(value) -> str:
@@ -35,8 +40,12 @@ def render_status(state: dict) -> str:
                 note = f"scheduled {_when(latest['time'])}, never ran"
             elif step["health"] == "blocked":
                 note = "waiting on " + ", ".join(step["blocked_by"])
+            elif step["health"] == "noop":
+                note = f"{_when(latest['time'])}  ran and did nothing" + (f"  ({_why(latest)})" if _why(latest) else "")
             elif step["health"] == "none":
                 note = "no runs on file"
+            elif step["health"] == "ok" and latest and latest.get("state") == "ok" and _why(latest):
+                note += f"  (did nothing, accepted: {_why(latest)})"
             deps = f"  <- {', '.join(step['depends_on'])}" if step["depends_on"] else ""
             flag = "  [paused]" if step["paused"] else ""
             lines.append(f"  {LABEL[step['health']]:<12} {step['title']} ({step['id']}, job {step['job_id']}){flag}{deps}")

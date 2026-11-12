@@ -1,12 +1,71 @@
 """Load and validate workflow scaffold files (one YAML file per workflow)."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
 
 WORKFLOW_REQUIRED = ("id", "title", "description", "steps")
 STEP_REQUIRED = ("id", "title", "job_id")
+
+# What a step is expected to produce. Optional; a step without the block gets these.
+#   allow_silent  a run that prints nothing is ok for this step
+#   noop          "flag": a run that did nothing is shown as no-op. "ok": it counts as ok
+#   success_when  regex. Used only when the run has no step_result line. No match means no-op
+#   noop_when     regexes. Used only when the run has no step_result line. A match means no-op
+DEFAULT_EXPECT = {"allow_silent": False, "noop": "flag", "success_when": None, "noop_when": []}
+NOOP_SETTINGS = ("flag", "ok")
+
+
+def _regex_ok(value: str) -> bool:
+    try:
+        re.compile(value)
+    except re.error:
+        return False
+    return True
+
+
+def validate_expect(expect, where: str) -> list[str]:
+    if expect is None:
+        return []
+    if not isinstance(expect, dict):
+        return [f"{where}: must be a mapping with allow_silent, noop, success_when or noop_when"]
+    errors = []
+    for key in expect:
+        if key not in DEFAULT_EXPECT:
+            errors.append(f"{where}.{key}: unknown key (use allow_silent, noop, success_when, noop_when)")
+    if "allow_silent" in expect and not isinstance(expect["allow_silent"], bool):
+        errors.append(f"{where}.allow_silent: must be true or false")
+    if "noop" in expect and (not isinstance(expect["noop"], str) or expect["noop"] not in NOOP_SETTINGS):
+        errors.append(f"{where}.noop: must be 'flag' or 'ok'")
+    success = expect.get("success_when")
+    if success is not None:
+        if not isinstance(success, str):
+            errors.append(f"{where}.success_when: must be one regular expression (text)")
+        elif not _regex_ok(success):
+            errors.append(f"{where}.success_when: not a valid regular expression")
+    patterns = expect.get("noop_when")
+    if patterns is not None:
+        if not isinstance(patterns, list):
+            errors.append(f"{where}.noop_when: must be a list of regular expressions")
+        else:
+            for index, pattern in enumerate(patterns):
+                if not isinstance(pattern, str):
+                    errors.append(f"{where}.noop_when[{index}]: must be a regular expression (text)")
+                elif not _regex_ok(pattern):
+                    errors.append(f"{where}.noop_when[{index}]: not a valid regular expression")
+    return errors
+
+
+def normal_expect(expect) -> dict:
+    expect = expect or {}
+    return {
+        "allow_silent": bool(expect.get("allow_silent", False)),
+        "noop": expect.get("noop") or "flag",
+        "success_when": expect.get("success_when") or None,
+        "noop_when": list(expect.get("noop_when") or []),
+    }
 
 
 def _text(value) -> str:
@@ -53,6 +112,7 @@ def validate(data, jobs: dict | None) -> list[str]:
             depends = []
         if not isinstance(depends, list):
             errors.append(f"{where}.depends_on: must be a list of step ids")
+        errors.extend(validate_expect(step.get("expect"), f"{where}.expect"))
     ids = {str(s.get("id")) for s in steps if isinstance(s, dict) and s.get("id")}
     graph: dict[str, list[str]] = {}
     for index, step in enumerate(steps):
@@ -130,6 +190,7 @@ def load_file(path: Path, jobs: dict | None) -> dict:
             "description": _text(step.get("description")),
             "job_id": str(step["job_id"]),
             "depends_on": [str(d) for d in (step.get("depends_on") or [])],
+            "expect": normal_expect(step.get("expect")),
         }
         for step in data["steps"]
     ]

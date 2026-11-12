@@ -156,7 +156,7 @@ def pending_failures(context) -> list[tuple[dict, dict, dict]]:
         if workflow["invalid"]:
             continue
         for step in workflow["steps"]:
-            traces = [t for t in step_traces(context.reader, context.traces, jobs[step["job_id"]], step["job_id"], context.now())
+            traces = [t for t in step_traces(context.reader, context.traces, jobs[step["job_id"]], step["job_id"], context.now(), step["expect"])
                       if t["state"] != "missed"]
             if traces and traces[0]["state"] == "failed":
                 found.append((workflow, step, traces[0]))

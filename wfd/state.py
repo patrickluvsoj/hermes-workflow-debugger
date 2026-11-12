@@ -1,13 +1,15 @@
 """State is computed on every read and never stored.
 
 Rules (spec: Design Decisions > States):
-- A step's own result is the state of its latest trace: failed, missed or ok.
+- A step's own result is the state of its latest trace: failed, missed, noop or ok.
   No traces at all is "none" (did not run).
+- No-op: the run worked and did nothing, on a step where that is not expected
+  (wfd/traces.py has the rules). A no-op upstream does not block the steps after it.
 - Blocked: an upstream step is failed, missed or blocked, and this step has not
   run since that problem started.
 - Paused is separate from health. A paused step keeps its own last result, is
   never blocked or missed, and is left out of the workflow roll-up.
-- Workflow health is the worst of its unpaused steps: failed, missed, blocked, ok.
+- Workflow health is the worst of its unpaused steps: failed, missed, blocked, noop, ok.
 """
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ from datetime import datetime, timedelta
 
 from .hermes_reader import to_local
 
-RANK = {"failed": 0, "missed": 1, "blocked": 2, "ok": 3, "none": 4}
+RANK = {"failed": 0, "missed": 1, "blocked": 2, "noop": 3, "ok": 4, "none": 5}
 OVERDUE_GRACE = timedelta(minutes=30)
 SLOT_SLACK = timedelta(seconds=90)
 
@@ -69,6 +71,7 @@ def missed_trace(when: datetime) -> dict:
     return {
         "file": None, "time": when.replace(microsecond=0).isoformat(), "state": "missed",
         "status_line": "scheduled, never ran", "status_known": True, "first_error_line": None,
+        "outcome": None, "reason": None, "detail": None, "result_problem": None,
         "session_id": None, "workflow_run_id": None, "local_sig": None, "duration_s": None,
     }
 
@@ -87,7 +90,7 @@ def evaluate_steps(steps: list[dict]) -> None:
         step["last_run"] = real[0]["time"] if real else None
         step["own"] = own
         step["blocked_by"] = []
-        step["problem_time"] = latest["time"] if own in ("failed", "missed") else None
+        step["problem_time"] = latest["time"] if own in ("failed", "missed", "noop") else None
         if step["paused"]:
             step["health"] = own
             continue
@@ -157,9 +160,10 @@ def _error_sig(trace: dict, incidents: list[dict]) -> str | None:
     return trace["local_sig"]
 
 
-def step_traces(reader, store_traces, job: dict, job_id: str, now: datetime) -> list[dict]:
-    """All traces for one job, newest first, with missed runs and signatures."""
-    traces = store_traces.traces(job_id)
+def step_traces(reader, store_traces, job: dict, job_id: str, now: datetime, expect: dict | None = None) -> list[dict]:
+    """All traces for one job, newest first, with missed runs and signatures.
+    `expect` is the step's expectation from its scaffold file."""
+    traces = store_traces.traces(job_id, expect)
     executions = reader.executions(job_id)
     incidents = reader.incidents(job_id)
     _attach_durations(traces, executions)
@@ -213,7 +217,7 @@ def compute_state(reader, trace_store, scaffold_dir, summaries, now: datetime, m
                 "paused_since": (to_local(job.get("paused_at")).replace(microsecond=0).isoformat()
                                  if paused and to_local(job.get("paused_at")) else None),
                 "source": reader.script_info(job),
-                "traces": step_traces(reader, trace_store, job, item["job_id"], now),
+                "traces": step_traces(reader, trace_store, job, item["job_id"], now, item["expect"]),
             })
         evaluate_steps(steps)
         problems = []
